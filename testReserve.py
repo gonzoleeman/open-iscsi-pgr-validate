@@ -25,12 +25,11 @@ TODO
  - Add config file support
  - Add command-line option parsing
  - Better integrate with unittest and nose
- - Setup validation, e.g. verify different disc paths are to same disc
  - Set up iSCSI iface targets instead of requiring that precondition
 """
 
 
-__version__ = "Version 0.2"
+__version__ = "Version 0.3"
 __author__ = "Lee Duncan <leeman.duncan@gmail.com>"
 
 
@@ -38,8 +37,10 @@ import sys
 import os
 import subprocess
 import copy
+import time
 
 import unittest
+import nose
 
 
 #
@@ -149,6 +150,14 @@ def reserve(i, prout_type):
                               "--prout-type=" + prout_type])
     return res.result
 
+def clear(i):
+    """Clear Registrations and Reservation on a target"""
+    res = runSgCmdWithOutput(i,
+                             ["--out", "--clear",
+                              "--param-rk=" + i.key])
+    return res.result
+
+
 class Reservation:
     def __init__(self, key=None, rtype=None):
         self.key = key
@@ -209,7 +218,7 @@ def getDiskInquirySn(dev):
     dprint("getDiskInquirySn(%s) -> %s" % (dev, ret))
     return ret
 
-def setUp():
+def setUpModule():
     """Whole-module setup -- not yet used?"""
     dprint("Module-level setup ...")
     if os.geteuid() != 0:
@@ -235,50 +244,120 @@ def setUp():
             print >>sys.stderr, "Fatal: cannot get INQUIRY data from %s\n" % initC.dev
             sys.exit(1)
 
+
 ################################################################
 
-class Test01RegisterTestCase(unittest.TestCase):
-    """Test PGR REGISTER Commands"""
 
-    def test00EnsureNoRegistrants(self):
-        """Make sure there are no registrations"""
-        # make sure there are no registrants
-        registrants = getRegistrants(initA)
-        if len(registrants) > 0:
-            self.fail("Must start with no registrants")
+class Test01CanRegisterTestCase(unittest.TestCase):
+    """Can register initiators"""
 
-    def test01CanRegister(self):
-        """Can register all Initiators"""
-        dprint("Registering host A ...")
+    def setUp(self):
+        """Set up for tests"""
+        clear(initA)
+        clear(initB)
+
+    def testCanRegisterInitA(self):
+        """Can register Initiator A"""
         resA = register(initA)
         self.assertEqual(resA, 0)
-        dprint("Registering host A ...")
+
+    def testCanRegisterInitB(self):
+        """Can register Initiator B"""
+        dprint("Registering host B ...")
         resB = register(initB)
         self.assertEqual(resB, 0)
 
-    def test02CanReadRegistrants(self):
-        """Can read registrants from each host"""
-        num_registrants = 2
-        registrantsA = getRegistrants(initA)
-        self.assertEqual(len(registrantsA), num_registrants)
-        self.assertEqual(registrantsA[0], initA.key)
-        registrantsB = getRegistrants(initB)
-        self.assertEqual(len(registrantsB), num_registrants)
-        self.assertEqual(registrantsB[1], initB.key)
-        for i in range(num_registrants):
-            self.assertEqual(registrantsA[i], registrantsB[i])
-        if three_way:
-            registrantsC = getRegistrants(initC)
-            self.assertEqual(len(registrantsC), num_registrants)
-            for i in range(num_registrants):
-                self.assertEqual(registrantsA[i], registrantsC[i])
 
-    def test03ReregisterFails(self):
+################################################################
+
+class Test02CanSeeRegistrationsTestCase(unittest.TestCase):
+    """Can see initiator registration"""
+
+    def setUp(self):
+        """Set up for tests"""
+        res = clear(initA)
+        res = clear(initB)
+
+    def testCanSeeNoRegistrations(self):
+        """Can read and see no registrations when there are none"""
+        registrantsA = getRegistrants(initA)
+        self.assertEqual(len(registrantsA), 0)
+
+    def testCanSeeRegistration(self):
+        """Can see registration from same initiator"""
+        res = register(initA)
+        self.assertEqual(res, 0)
+        res = register(initB)
+        self.assertEqual(res, 0)
+        registrantsA = getRegistrants(initA)
+        self.assertEqual(len(registrantsA), 2)
+        self.assertEqual(registrantsA[0], initA.key)
+        self.assertEqual(registrantsA[1], initB.key)
+
+    def testCanSeeRegOnDifferentInit(self):
+        """Can see registration from another initiator"""
+        resA = register(initA)
+        self.assertEqual(resA, 0)
+        registrantsB = getRegistrants(initB)
+        self.assertEqual(len(registrantsB), 1)
+        self.assertEqual(registrantsB[0], initA.key)
+
+################################################################
+
+class Test03CanUnregisterTestCase(unittest.TestCase):
+
+    def setUp(self):
+        """Set up for tests"""
+        clear(initA)
+        clear(initB)
+        register(initA)
+        register(initB)
+
+    def testCanUnregister(self):
+        """Can unregister hosts"""
+        res = unregister(initA)
+        self.assertEqual(res, 0)
+        registrants = getRegistrants(initA)
+        self.assertEqual(len(registrants), 1)
+        res = unregister(initB)
+        self.assertEqual(res, 0)
+        registrants = getRegistrants(initB)
+        self.assertEqual(len(registrants), 0)
+
+
+################################################################
+
+class Test04ReregistrationFailsTestCase(unittest.TestCase):
+
+    def setUp(self):
+        """Set up for tests"""
+        clear(initA)
+        clear(initB)
+        register(initA)
+        register(initB)
+
+    def testReregisterFails(self):
         """Cannot re-register"""
         initAcopy = copy.copy(initA)
         initAcopy.key = "0x1"
         resA = register(initAcopy)
         self.assertNotEqual(resA, 0)
+        registrantsA = getRegistrants(initA)
+        self.assertEqual(len(registrantsA), 2)
+        self.assertEqual(registrantsA[0], initA.key)
+        self.assertEqual(registrantsA[1], initB.key)
+
+
+################################################################
+
+class Test05RegisterAndIgnoreTestCase(unittest.TestCase):
+
+    def setUp(self):
+        """Set up for tests"""
+        clear(initA)
+        clear(initB)
+        register(initA)
+        register(initB)
 
     def test04CanRegisterAndIgnore(self):
         """Can register and ignore existing registrantion"""
@@ -295,49 +374,69 @@ class Test01RegisterTestCase(unittest.TestCase):
         registrantsA = getRegistrants(initA)
         self.assertEqual(registrantsA[0], initA.key)
 
-    def test05CanUnregister(self):
-        """Can unregister hosts"""
-        res = unregister(initA)
-        self.assertEqual(res, 0)
-        res = unregister(initB)
-        self.assertEqual(res, 0)
-        registrants = getRegistrants(initA)
-        self.assertEqual(len(registrants), 0)
-
 
 ################################################################
 
-class Test02ReserveEaTestCase(unittest.TestCase):
-    """Test PGR RESERVE Exclusive Access"""
+class Test06CanReserveEaTestCase(unittest.TestCase):
+    """Test that PGR RESERVE Exclusive Access works"""
 
     def setUp(self):
+        clear(initA)
+        clear(initB)
         register(initA)
         register(initB)
 
-    def test01CanReserve(self):
+    def testCanReserveEa(self):
         """Can reserve a target for exclusive access"""
         res = reserve(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
 
-    def test02CanReadReservation(self):
-        """Can read EA reservation from all hosts"""
-        res = reserve(initA, ProutTypes["ExclusiveAccess"])
-        self.assertEqual(res, 0)
+################################################################
+
+class Test07CanReadEaReservationTestCase(unittest.TestCase):
+    """Test that PGR RESERVE Exclusive Access can be read"""
+
+    def setUp(self):
+        clear(initA)
+        clear(initB)
+        register(initA)
+        register(initB)
+        reserve(initA, ProutTypes["ExclusiveAccess"])
+
+    def testCanReadReservationFromReserver(self):
+        """Can read EA reservation from reserving host"""
         resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
+ 
+    def testCanReadReservationFromNonReserver(self):
+        """Can read EA reservation from non-reserving host"""
         resvnB = getReservation(initB)
         self.assertEqual(resvnB.key, initA.key)
         self.assertEqual(resvnB.getRtypeNum(), ProutTypes["ExclusiveAccess"])
+
+    def testCanReadReservationFromNonRegistrant(self):
+        """Can read EA reservation from non-registrant host"""
         if three_way:
             resvnC = getReservation(initC)
             self.assertEqual(resvnC.key, initA.key)
             self.assertEqual(resvnC.getRtypeNum(), ProutTypes["ExclusiveAccess"])
 
+
+################################################################
+
+class Test08CanReleseEaReservationTestCase(unittest.TestCase):
+    """Test that PGR RESERVE Exclusive Access can be released"""
+
+    def setUp(self):
+        clear(initA)
+        clear(initB)
+        register(initA)
+        register(initB)
+        reserve(initA, ProutTypes["ExclusiveAccess"])
+
     def test03CanReleaseReservation(self):
         """Can release an EA reservation from reserving host"""
-        res = reserve(initA, ProutTypes["ExclusiveAccess"])
-        self.assertEqual(res, 0)
         resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
@@ -349,8 +448,6 @@ class Test02ReserveEaTestCase(unittest.TestCase):
     
     def test03CannotReleaseReservation(self):
         """Cannot release an EA reservation from non-reserving host"""
-        res = reserve(initA, ProutTypes["ExclusiveAccess"])
-        self.assertEqual(res, 0)
         resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
@@ -360,10 +457,21 @@ class Test02ReserveEaTestCase(unittest.TestCase):
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
 
+
+################################################################
+
+class Test09UnregisterEaHandlingTestCase(unittest.TestCase):
+    """Test how PGR RESERVE Exclusive Access reservation is handled during unregistration"""
+
+    def setUp(self):
+        clear(initA)
+        clear(initB)
+        register(initA)
+        register(initB)
+        reserve(initA, ProutTypes["ExclusiveAccess"])
+
     def test04UnregisterReleasesReservation(self):
-        """Un-registration of reserving host releases reservation"""
-        res = reserve(initA, ProutTypes["ExclusiveAccess"])
-        self.assertEqual(res, 0)
+        """Un-registration of reserving EA host releases reservation"""
         resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
@@ -374,9 +482,7 @@ class Test02ReserveEaTestCase(unittest.TestCase):
         self.assertEqual(resvnA.rtype, None)
 
     def test05UnregisterDoesNotReleaseReservation(self):
-        """Un-registration of non-reserving host does not release reservation"""
-        res = reserve(initA, ProutTypes["ExclusiveAccess"])
-        self.assertEqual(res, 0)
+        """Un-registration of non-reserving EA host does not release reservation"""
         resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
@@ -387,31 +493,29 @@ class Test02ReserveEaTestCase(unittest.TestCase):
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
 
     def test06ReservationHolderHasAccess(self):
-        """The Reservation Holder has Access to the target"""
+        """The Reservation Holder has Access to an EA target"""
         # initA get reservation
-        res = reserve(initA, ProutTypes["ExclusiveAccess"])
-        self.assertEqual(res, 0)
         resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
         # initA read from disk to /dev/null
+        time.sleep(2)                   # give I/O time to sync up
         ret = runCmdWithOutput(["dd", "if=" + initA.dev, "of=/dev/null",
                                 "bs=512", "count=1"])
         self.assertEqual(ret.result, 0)
-        # initA write from /dev/zero to 2nd 512-byte block on disc
+        # initA can write from /dev/zero to 2nd 512-byte block on disc
         ret = runCmdWithOutput(["dd", "if=/dev/zero", "of=" + initA.dev,
                                 "bs=512", "skip=1", "count=1"])
         self.assertEqual(ret.result, 0)
     
     def test07NonReservationHolderDoesNotHaveAccess(self):
-        """Non-Reservation Holders do not have Access to the target"""
+        """Non-Reservation Holders do not have Access to an EA target"""
         # initA get reservation
-        res = reserve(initA, ProutTypes["ExclusiveAccess"])
-        self.assertEqual(res, 0)
         resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
         # initB can't read from disk to /dev/null
+        time.sleep(2)                   # give I/O time to sync up
         ret = runCmdWithOutput(["dd", "if=" + initB.dev, "of=/dev/null",
                                 "bs=512", "count=1"])
         self.assertEqual(ret.result, 1)
@@ -420,22 +524,15 @@ class Test02ReserveEaTestCase(unittest.TestCase):
                                 "bs=512", "skip=1", "count=1"])
         self.assertEqual(ret.result, 1)
     
-    def tearDown(self):
-        dprint("Tearing down after a RESERVE test")
-        res = unregister(initA)
-        if res == 6:
-            unregister(initA)
-        res = unregister(initB)
-        if res == 6:
-            unregister(initB)
-
 
 ################################################################
 
-class Test03ReserveWETestCase(unittest.TestCase):
+class Test10ReserveWeTestCase(unittest.TestCase):
     """Test PGR RESERVE Write Exclusive"""
 
     def setUp(self):
+        clear(initA)
+        clear(initB)
         register(initA)
         register(initB)
 
@@ -460,7 +557,7 @@ class Test03ReserveWETestCase(unittest.TestCase):
             self.assertEqual(resvnC.getRtypeNum(), ProutTypes["WriteExclusive"])
 
     def test03CanReleaseReservation(self):
-        """Can release an WE reservation from reserving host"""
+        """Can release a WE reservation from reserving host"""
         res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
         resvnA = getReservation(initA)
@@ -473,7 +570,7 @@ class Test03ReserveWETestCase(unittest.TestCase):
         self.assertEqual(resvnA.rtype, None)
     
     def test03CannotReleaseReservation(self):
-        """Cannot release an WE reservation from non-reserving host"""
+        """Cannot release a WE reservation from non-reserving host"""
         res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
         resvnA = getReservation(initA)
@@ -486,7 +583,7 @@ class Test03ReserveWETestCase(unittest.TestCase):
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
 
     def test04UnregisterReleasesReservation(self):
-        """Un-registration of reserving host releases reservation"""
+        """Un-registration of reserving WE host releases reservation"""
         res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
         resvnA = getReservation(initA)
@@ -499,7 +596,7 @@ class Test03ReserveWETestCase(unittest.TestCase):
         self.assertEqual(resvnA.rtype, None)
 
     def test05UnregisterDoesNotReleaseReservation(self):
-        """Un-registration of non-reserving host does not release reservation"""
+        """Un-registration of non-reserving WE host does not release reservation"""
         res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
         resvnA = getReservation(initA)
@@ -512,7 +609,7 @@ class Test03ReserveWETestCase(unittest.TestCase):
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
 
     def test06ReservationHolderHasAccess(self):
-        """The Reservation Holder has Access to the target"""
+        """The Reservation Holder has Access to the WE target"""
         # initA get reservation
         res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
@@ -520,6 +617,7 @@ class Test03ReserveWETestCase(unittest.TestCase):
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
         # initA read from disk to /dev/null
+        time.sleep(2)                   # give I/O time to sync up
         ret = runCmdWithOutput(["dd", "if=" + initA.dev, "of=/dev/null",
                                 "bs=512", "count=1"])
         self.assertEqual(ret.result, 0)
@@ -529,7 +627,7 @@ class Test03ReserveWETestCase(unittest.TestCase):
         self.assertEqual(ret.result, 0)
     
     def test07NonReservationHolderDoesNotHaveAccess(self):
-        """Non-Reservation Holders do not have Write Access to the target"""
+        """Non-Reservation Holders do not have Write Access to the WE target"""
         # initA get reservation
         res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
@@ -537,6 +635,7 @@ class Test03ReserveWETestCase(unittest.TestCase):
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
         # initB can read from disk to /dev/null
+        time.sleep(2)                   # give I/O time to sync up
         ret = runCmdWithOutput(["dd", "if=" + initB.dev, "of=/dev/null",
                                 "bs=512", "count=1"])
         self.assertEqual(ret.result, 0)
@@ -545,15 +644,7 @@ class Test03ReserveWETestCase(unittest.TestCase):
                                 "bs=512", "skip=1", "count=1"])
         self.assertEqual(ret.result, 1)
     
-    def tearDown(self):
-        dprint("Tearing down after a RESERVE test")
-        res = unregister(initA)
-        if res == 6:
-            unregister(initA)
-        res = unregister(initB)
-        if res == 6:
-            unregister(initB)
 
 
 if __name__ == '__main__':
-    unittest.main()
+    nose.main()

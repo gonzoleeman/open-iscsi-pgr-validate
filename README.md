@@ -35,3 +35,9 @@ and iSCSI target, but only requires a single host.
 Development is being done on SLE 11 SP2, since the "iface" feature of open-
 iscsi works from here and does not seem to work from openSUSE 12.2 open-iscsi.
 The target is still using iscsitarget on openSUSE 12.2 for initial development.
+
+Version 0.3
+===========
+This version attempts to integrate better with nosetests, and it breaks the
+test cases into smaller pieces. Also added were some sleep() steps between
+creating a reservation and trying to do I/O to test that reservation.
