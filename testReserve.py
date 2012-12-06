@@ -3,76 +3,82 @@
 Python tests for SCSI-3 Persistent Group Reservations
 
 Description:
- This test suite verifies correct operation of a SCSI-3 PGR target. It
- does this using coordinated access to that SCSI target using three
- different hosts. The target transport does not matter for this test.
+ This test suite verifies correct operation of a SCSI-3 PGR target
+ over an iSCSI transport. It does this using coordinated access to
+ that iSCSI target using multiple open-iscsi initiator interfaces.
 
  These tests are designed to be run sequentially and completely,
  i.e. you cannot skip tests, as the state of earlier tests is used
  when running later tests.
 
 Requirements:
- - Three separate hosts that connect to a common SCSI target, and a
-   place from which to run the test, which can be one of the hosts or
-   can be a separate system that can reach the three hosts used for
-   testing.
- - Root ssh password-less access on all 3 hosts
- - The sg3_utils package on all three hosts
+ - Abililty to run as root (for device access)
+ - The sg3_utils package, specifically sg_persist (and sg_inq?)
+ - The open-iscsi package, supporting "iface" files, and 2 (or 3) disk
+   devices already configured, pointing to the same disc (using
+   different iSCSI initiators) -- Will be automatic "some day"
+ - An iSCSI target that claims to support Persistent Group
+   Reservations
 
 
 TODO
  - Add config file support
- - Auto-detect device path on each system
- - Actually verify systems are talking to the same/correct device
+ - Add command-line option parsing
+ - Better integrate with unittest and nose
+ - Setup validation, e.g. verify different disc paths are to same disc
+ - Set up iSCSI iface targets instead of requiring that precondition
 """
 
-__version__ = "Version 0.1"
+
+__version__ = "Version 0.2"
+__author__ = "Lee Duncan <leeman.duncan@gmail.com>"
+
 
 import sys
 import os
 import subprocess
 import copy
+
 import unittest
+
 
 #
 # config stuff ...
 #
 
-debug = False
+my_debug = False
 three_way = False
 
 ################################################################
 
-class HostCfgItem:
-    def __init__(self, hostname, key=None,
-                 sg_cmd="sg_persist", dev="/dev/sdc"):
-        self.hostname = hostname
-        self.key = key
-        self.cmd = sg_cmd
+class InitCfgItem:
+    def __init__(self, iface_name, dev, key=None):
+        self.iface_name = iface_name
         self.dev = dev
+        self.key = key
 
-# hosts A and B are group members, and C is not, so C will
-# never need a key
-hostA = HostCfgItem("localhost", "0x123abc")
-hostB = HostCfgItem("linux-server", "0x696969")
-hostC = HostCfgItem("linux-s2", dev="/dev/sdd")
+initA = InitCfgItem("t1", "/dev/sdc", "0x123abc")
+initB = InitCfgItem("t2", "/dev/sdd", "0x696969")
+if three_way:
+    initC = InitCfgItem("t3", "/dev/sde")
 
 ################################################################
 
-class ProutType:
-    NoType = "0"
-    WriteExclusive = "1"
-    ExclusiveAccess = "3"
-    WriteExclusiveRegistrantsOnly = "5"
-    ExclusiveAccessRegistrantsOnly = "6"
-    WriteExclusiveAllRegistrants = "7"
-    ExclusiveAccessAllRegistrants = "8"
+# List of Reservation Types, for prout-type"""
+ProutTypes = {
+    "NoType" : "0",
+    "WriteExclusive" : "1",
+    "ExclusiveAccess" : "3",
+    "WriteExclusiveRegistrantsOnly" : "5",
+    "ExclusiveAccessRegistrantsOnly" : "6",
+    "WriteExclusiveAllRegistrants" : "7",
+    "ExclusiveAccessAllRegistrants" : "8"}
 
 ################################################################
 
 def dprint(*args):
     """debug print"""
-    if debug:
+    if my_debug:
         print >>sys.stderr, 'DEBUG:',
         for arg in args:
             print >>sys.stderr, arg,
@@ -99,23 +105,15 @@ def runCmdWithOutput(cmd):
         lines = None
     return RunResult(lines, xit_val)
 
-def runSgCmdWithOutput(h, cmd):
+def runSgCmdWithOutput(i, cmd):
     """Run the SG command on specified host"""
-    my_cmd = ["ssh", h.hostname, h.cmd, "-n"] + cmd + [h.dev]
+    my_cmd = ["sg_persist", "-n"] + cmd + [i.dev]
     return runCmdWithOutput(my_cmd)
 
-def runSshCmdWithOutput(h, cmd):
-    """Run the command using ssh on the specified host"""
-    my_cmd = ["ssh", h.hostname] + cmd
-    return runCmdWithOutput(my_cmd)
-
-def getRegistrants(h):
+def getRegistrants(i):
     """Get list of registrants remotely"""
     registrants = []
-    res = runSgCmdWithOutput(h, ["-k"])
-    dprint("Parsing %d lines of registrants ..." % len(res.lines))
-    for o in res.lines:
-        dprint("line=", o)
+    res = runSgCmdWithOutput(i, ["-k"])
     if "no registered reservation keys" not in res.lines[0].lower():
         for l in res.lines[1:]:
             dprint("key=", l.strip())
@@ -123,32 +121,31 @@ def getRegistrants(h):
     dprint("returning registrants list=", registrants)
     return registrants
 
-def Register(h):
+def register(i):
     """Register the remote I_T Nexus"""
-    res = runSgCmdWithOutput(h,
-                             ["--out", "--register", "--param-sark=" + h.key])
+    res = runSgCmdWithOutput(i, ["--out", "--register", "--param-sark=" + i.key])
     return res.result
 
-def RegisterAndIgnore(h, new_key):
+def registerAndIgnore(i, new_key):
     """Register the remote I_T Nexus"""
-    res = runSgCmdWithOutput(h,
+    res = runSgCmdWithOutput(i,
                              ["--out", "--register",
-                              "--param-rk=" + h.key,
+                              "--param-rk=" + i.key,
                               "--param-sark=" + new_key])
     return res.result
 
-def Unregister(h):
+def unregister(i):
     """UnRegister the remote I_T Nexus"""
-    res = runSgCmdWithOutput(h,
+    res = runSgCmdWithOutput(i,
                              ["--out", "--register",
-                              "--param-rk=" + h.key])
+                              "--param-rk=" + i.key])
     return res.result
 
-def Reserve(h, prout_type):
+def reserve(i, prout_type):
     """Reserve for the host using the supplied type"""
-    res = runSgCmdWithOutput(h,
+    res = runSgCmdWithOutput(i,
                              ["--out", "--reserve",
-                              "--param-rk=" + h.key,
+                              "--param-rk=" + i.key,
                               "--prout-type=" + prout_type])
     return res.result
 
@@ -157,18 +154,18 @@ class Reservation:
         self.key = key
         self.rtype = rtype
     def getRtypeNum(self):
-        ret = ProutType.NoType
+        ret = ProutTypes["NoType"]
         if self.rtype == "Exclusive Access":
-            ret = ProutType.ExclusiveAccess
+            ret = ProutTypes["ExclusiveAccess"]
         elif self.rtype == "Write Exclusive":
-            ret = ProutType.WriteExclusive
+            ret = ProutTypes["WriteExclusive"]
         dprint("Given rtype=%s, returning Num=%s" % (self.rtype,
                                                      ret))
         return ret
 
-def getReservation(h):
+def getReservation(i):
     """Get current reservation"""
-    res = runSgCmdWithOutput(h, ["-r"])
+    res = runSgCmdWithOutput(i, ["-r"])
     dprint("Parsing %d lines of reservations:" % len(res.lines))
     for o in res.lines:
         dprint("line=", o)
@@ -182,26 +179,63 @@ def getReservation(h):
         dprint("No Reservation found")
     return rr
 
-def Release(h, prout_type):
+def release(i, prout_type):
     """Reserve for the host using the supplied type"""
-    res = runSgCmdWithOutput(h,
+    res = runSgCmdWithOutput(i,
                              ["--out", "--release",
-                              "--param-rk=" + h.key,
+                              "--param-rk=" + i.key,
                               "--prout-type=" + prout_type])
     return res.result
 
 ################################################################
 
+def verifyCmdExists(cmd):
+    """Verify that the command exists"""
+    dprint("Verifying command exists:", cmd)
+    try:
+        runCmdWithOutput(cmd)
+    except Exception, e:
+        print >>sys.stderr, "Fatal: Command not found: %s\n" % cmd[0]
+        sys.exit(1)
+
+def getDiskInquirySn(dev):
+    """Get the Disk Serial Number"""
+    res = runCmdWithOutput(["sg_inq", dev])
+    ret = None
+    if res.result == 0:
+        if "Unit serial number" in res.lines[-1]:
+            line = res.lines[-1]
+            ret = line.split()[-1]
+    dprint("getDiskInquirySn(%s) -> %s" % (dev, ret))
+    return ret
+
 def setUp():
     """Whole-module setup -- not yet used?"""
-    # make sure we are root
-    # make sure the sg_persist command exists
-    # make sure the remote host exists
-    # make sure we can find and run (as root) the sg_persist
-    #  command on all hosts
-    # make sure the device is the same on all hosts
     dprint("Module-level setup ...")
-    pass
+    if os.geteuid() != 0:
+        print >>sys.stderr, "Fatal: must be root to run this script\n"
+        sys.exit(1)
+    verifyCmdExists(["sg_persist", "-V"])
+    verifyCmdExists(["sg_inq", "-V"])
+    verifyCmdExists(["dd", "--version"])
+    # make sure all devices are the same
+    iiA = getDiskInquirySn(initA.dev)
+    iiB = getDiskInquirySn(initB.dev)
+    if not iiA or not iiB:
+        print >>sys.stderr, "Fatal: cannot get INQUIRY data from %s or %s\n" % (initA.dev,
+                                                                                initB.dev)
+        sys.exit(1)
+    if iiA != iiB:
+        print >>sys.stderr, "Fatal: Serial numbers differ for %s and %s\n" % (initA.dev,
+                                                                              initB.dev)
+        sys.exit(1)
+    if three_way:
+        iiC = getDiskInquiryInfo(initC.dev)
+        if not iiC:
+            print >>sys.stderr, "Fatal: cannot get INQUIRY data from %s\n" % initC.dev
+            sys.exit(1)
+
+################################################################
 
 class Test01RegisterTestCase(unittest.TestCase):
     """Test PGR REGISTER Commands"""
@@ -209,324 +243,317 @@ class Test01RegisterTestCase(unittest.TestCase):
     def test00EnsureNoRegistrants(self):
         """Make sure there are no registrations"""
         # make sure there are no registrants
-        registrants = getRegistrants(hostA)
+        registrants = getRegistrants(initA)
         if len(registrants) > 0:
             self.fail("Must start with no registrants")
 
     def test01CanRegister(self):
         """Can register all Initiators"""
         dprint("Registering host A ...")
-        resA = Register(hostA)
+        resA = register(initA)
         self.assertEqual(resA, 0)
         dprint("Registering host A ...")
-        resB = Register(hostB)
+        resB = register(initB)
         self.assertEqual(resB, 0)
 
     def test02CanReadRegistrants(self):
         """Can read registrants from each host"""
         num_registrants = 2
-        registrantsA = getRegistrants(hostA)
+        registrantsA = getRegistrants(initA)
         self.assertEqual(len(registrantsA), num_registrants)
-        self.assertEqual(registrantsA[0], hostA.key)
-        registrantsB = getRegistrants(hostB)
+        self.assertEqual(registrantsA[0], initA.key)
+        registrantsB = getRegistrants(initB)
         self.assertEqual(len(registrantsB), num_registrants)
-        self.assertEqual(registrantsB[1], hostB.key)
+        self.assertEqual(registrantsB[1], initB.key)
         for i in range(num_registrants):
             self.assertEqual(registrantsA[i], registrantsB[i])
         if three_way:
-            registrantsC = getRegistrants(hostC)
+            registrantsC = getRegistrants(initC)
             self.assertEqual(len(registrantsC), num_registrants)
             for i in range(num_registrants):
                 self.assertEqual(registrantsA[i], registrantsC[i])
 
     def test03ReregisterFails(self):
         """Cannot re-register"""
-        hostAcopy = copy.copy(hostA)
-        hostAcopy.key = "0x1"
-        resA = Register(hostAcopy)
+        initAcopy = copy.copy(initA)
+        initAcopy.key = "0x1"
+        resA = register(initAcopy)
         self.assertNotEqual(resA, 0)
 
     def test04CanRegisterAndIgnore(self):
         """Can register and ignore existing registrantion"""
         # register with key "0x1"
-        hostAcopy = copy.copy(hostA)
-        hostAcopy.key = "0x1"
-        result = RegisterAndIgnore(hostA, hostAcopy.key)
+        initAcopy = copy.copy(initA)
+        initAcopy.key = "0x1"
+        result = registerAndIgnore(initA, initAcopy.key)
         self.assertEqual(result, 0)
-        registrantsA = getRegistrants(hostAcopy)
-        self.assertEqual(registrantsA[0], hostAcopy.key)
+        registrantsA = getRegistrants(initAcopy)
+        self.assertEqual(registrantsA[0], initAcopy.key)
         # re-register with normal key
-        result = RegisterAndIgnore(hostAcopy, hostA.key)
+        result = registerAndIgnore(initAcopy, initA.key)
         self.assertEqual(result, 0)
-        registrantsA = getRegistrants(hostA)
-        self.assertEqual(registrantsA[0], hostA.key)
+        registrantsA = getRegistrants(initA)
+        self.assertEqual(registrantsA[0], initA.key)
 
     def test05CanUnregister(self):
         """Can unregister hosts"""
-        res = Unregister(hostA)
+        res = unregister(initA)
         self.assertEqual(res, 0)
-        res = Unregister(hostB)
+        res = unregister(initB)
         self.assertEqual(res, 0)
-        registrants = getRegistrants(hostA)
+        registrants = getRegistrants(initA)
         self.assertEqual(len(registrants), 0)
 
 
-class Test02ReserveEATestCase(unittest.TestCase):
+################################################################
+
+class Test02ReserveEaTestCase(unittest.TestCase):
     """Test PGR RESERVE Exclusive Access"""
 
     def setUp(self):
-        Register(hostA)
-        Register(hostB)
+        register(initA)
+        register(initB)
 
     def test01CanReserve(self):
         """Can reserve a target for exclusive access"""
-        res = Reserve(hostA, ProutType.ExclusiveAccess)
+        res = reserve(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
 
     def test02CanReadReservation(self):
         """Can read EA reservation from all hosts"""
-        res = Reserve(hostA, ProutType.ExclusiveAccess)
+        res = reserve(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.ExclusiveAccess)
-        resvnB = getReservation(hostB)
-        self.assertEqual(resvnB.key, hostA.key)
-        self.assertEqual(resvnB.getRtypeNum(), ProutType.ExclusiveAccess)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
+        resvnB = getReservation(initB)
+        self.assertEqual(resvnB.key, initA.key)
+        self.assertEqual(resvnB.getRtypeNum(), ProutTypes["ExclusiveAccess"])
         if three_way:
-            resvnC = getReservation(hostC)
-            self.assertEqual(resvnC.key, hostA.key)
-            self.assertEqual(resvnC.getRtypeNum(), ProutType.ExclusiveAccess)
+            resvnC = getReservation(initC)
+            self.assertEqual(resvnC.key, initA.key)
+            self.assertEqual(resvnC.getRtypeNum(), ProutTypes["ExclusiveAccess"])
 
     def test03CanReleaseReservation(self):
         """Can release an EA reservation from reserving host"""
-        res = Reserve(hostA, ProutType.ExclusiveAccess)
+        res = reserve(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.ExclusiveAccess)
-        res = Release(hostA, ProutType.ExclusiveAccess)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
+        res = release(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
+        resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, None)
         self.assertEqual(resvnA.rtype, None)
     
     def test03CannotReleaseReservation(self):
         """Cannot release an EA reservation from non-reserving host"""
-        res = Reserve(hostA, ProutType.ExclusiveAccess)
+        res = reserve(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.ExclusiveAccess)
-        res = Release(hostB, ProutType.ExclusiveAccess)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
+        res = release(initB, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.ExclusiveAccess)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
 
     def test04UnregisterReleasesReservation(self):
         """Un-registration of reserving host releases reservation"""
-        dprint("test04 ...")
-        res = Reserve(hostA, ProutType.ExclusiveAccess)
+        res = reserve(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.ExclusiveAccess)
-        res = Unregister(hostA)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
+        res = unregister(initA)
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
+        resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, None)
         self.assertEqual(resvnA.rtype, None)
 
     def test05UnregisterDoesNotReleaseReservation(self):
         """Un-registration of non-reserving host does not release reservation"""
-        dprint("test05 ...")
-        res = Reserve(hostA, ProutType.ExclusiveAccess)
+        res = reserve(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.ExclusiveAccess)
-        res = Unregister(hostB)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
+        res = unregister(initB)
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.ExclusiveAccess)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
 
     def test06ReservationHolderHasAccess(self):
         """The Reservation Holder has Access to the target"""
-        dprint("test06 ...")
-        # hostA get reservation
-        res = Reserve(hostA, ProutType.ExclusiveAccess)
+        # initA get reservation
+        res = reserve(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.ExclusiveAccess)
-        # hostA read from disk to /dev/null
-        ret = runSshCmdWithOutput(hostA,
-                                   ["dd", "if=" + hostA.dev, "of=/dev/null",
-                                    "bs=512", "count=1"])
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
+        # initA read from disk to /dev/null
+        ret = runCmdWithOutput(["dd", "if=" + initA.dev, "of=/dev/null",
+                                "bs=512", "count=1"])
         self.assertEqual(ret.result, 0)
-        # hostA write from /dev/zero to 2nd 512-byte block on disc
-        ret = runSshCmdWithOutput(hostA,
-                                   ["dd", "if=/dev/zero", "of=" + hostA.dev,
-                                    "bs=512", "skip=1", "count=1"])
+        # initA write from /dev/zero to 2nd 512-byte block on disc
+        ret = runCmdWithOutput(["dd", "if=/dev/zero", "of=" + initA.dev,
+                                "bs=512", "skip=1", "count=1"])
         self.assertEqual(ret.result, 0)
     
     def test07NonReservationHolderDoesNotHaveAccess(self):
         """Non-Reservation Holders do not have Access to the target"""
-        dprint("test07 ...")
-        # hostA get reservation
-        res = Reserve(hostA, ProutType.ExclusiveAccess)
+        # initA get reservation
+        res = reserve(initA, ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.ExclusiveAccess)
-        # hostB can't read from disk to /dev/null
-        ret = runSshCmdWithOutput(hostB,
-                                   ["dd", "if=" + hostB.dev, "of=/dev/null",
-                                    "bs=512", "count=1"])
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
+        # initB can't read from disk to /dev/null
+        ret = runCmdWithOutput(["dd", "if=" + initB.dev, "of=/dev/null",
+                                "bs=512", "count=1"])
         self.assertEqual(ret.result, 1)
-        # hostB can't write from /dev/zero to 2nd 512-byte block on disc
-        ret = runSshCmdWithOutput(hostB,
-                                   ["dd", "if=/dev/zero", "of=" + hostB.dev,
-                                    "bs=512", "skip=1", "count=1"])
+        # initB can't write from /dev/zero to 2nd 512-byte block on disc
+        ret = runCmdWithOutput(["dd", "if=/dev/zero", "of=" + initB.dev,
+                                "bs=512", "skip=1", "count=1"])
         self.assertEqual(ret.result, 1)
     
     def tearDown(self):
         dprint("Tearing down after a RESERVE test")
-        res = Unregister(hostA)
+        res = unregister(initA)
         if res == 6:
-            Unregister(hostA)
-        res = Unregister(hostB)
+            unregister(initA)
+        res = unregister(initB)
         if res == 6:
-            Unregister(hostB)
+            unregister(initB)
+
+
+################################################################
 
 class Test03ReserveWETestCase(unittest.TestCase):
     """Test PGR RESERVE Write Exclusive"""
 
     def setUp(self):
-        Register(hostA)
-        Register(hostB)
+        register(initA)
+        register(initB)
 
     def test01CanReserve(self):
         """Can reserve a target for exclusive access"""
-        res = Reserve(hostA, ProutType.WriteExclusive)
+        res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
 
     def test02CanReadReservation(self):
         """Can read WE reservation from all hosts"""
-        res = Reserve(hostA, ProutType.WriteExclusive)
+        res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.WriteExclusive)
-        resvnB = getReservation(hostB)
-        self.assertEqual(resvnB.key, hostA.key)
-        self.assertEqual(resvnB.getRtypeNum(), ProutType.WriteExclusive)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        resvnB = getReservation(initB)
+        self.assertEqual(resvnB.key, initA.key)
+        self.assertEqual(resvnB.getRtypeNum(), ProutTypes["WriteExclusive"])
         if three_way:
-            resvnC = getReservation(hostC)
-            self.assertEqual(resvnC.key, hostA.key)
-            self.assertEqual(resvnC.getRtypeNum(), ProutType.WriteExclusive)
+            resvnC = getReservation(initC)
+            self.assertEqual(resvnC.key, initA.key)
+            self.assertEqual(resvnC.getRtypeNum(), ProutTypes["WriteExclusive"])
 
     def test03CanReleaseReservation(self):
         """Can release an WE reservation from reserving host"""
-        res = Reserve(hostA, ProutType.WriteExclusive)
+        res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.WriteExclusive)
-        res = Release(hostA, ProutType.WriteExclusive)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        res = release(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
+        resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, None)
         self.assertEqual(resvnA.rtype, None)
     
     def test03CannotReleaseReservation(self):
         """Cannot release an WE reservation from non-reserving host"""
-        res = Reserve(hostA, ProutType.WriteExclusive)
+        res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.WriteExclusive)
-        res = Release(hostB, ProutType.WriteExclusive)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        res = release(initB, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.WriteExclusive)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
 
     def test04UnregisterReleasesReservation(self):
         """Un-registration of reserving host releases reservation"""
-        dprint("test04 ...")
-        res = Reserve(hostA, ProutType.WriteExclusive)
+        res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.WriteExclusive)
-        res = Unregister(hostA)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        res = unregister(initA)
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
+        resvnA = getReservation(initA)
         self.assertEqual(resvnA.key, None)
         self.assertEqual(resvnA.rtype, None)
 
     def test05UnregisterDoesNotReleaseReservation(self):
         """Un-registration of non-reserving host does not release reservation"""
-        dprint("test05 ...")
-        res = Reserve(hostA, ProutType.WriteExclusive)
+        res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.WriteExclusive)
-        res = Unregister(hostB)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        res = unregister(initB)
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.WriteExclusive)
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
 
     def test06ReservationHolderHasAccess(self):
         """The Reservation Holder has Access to the target"""
-        dprint("test06 ...")
-        # hostA get reservation
-        res = Reserve(hostA, ProutType.WriteExclusive)
+        # initA get reservation
+        res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.WriteExclusive)
-        # hostA read from disk to /dev/null
-        ret = runSshCmdWithOutput(hostA,
-                                   ["dd", "if=" + hostA.dev, "of=/dev/null",
-                                    "bs=512", "count=1"])
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        # initA read from disk to /dev/null
+        ret = runCmdWithOutput(["dd", "if=" + initA.dev, "of=/dev/null",
+                                "bs=512", "count=1"])
         self.assertEqual(ret.result, 0)
-        # hostA write from /dev/zero to 2nd 512-byte block on disc
-        ret = runSshCmdWithOutput(hostA,
-                                   ["dd", "if=/dev/zero", "of=" + hostA.dev,
-                                    "bs=512", "skip=1", "count=1"])
+        # initA write from /dev/zero to 2nd 512-byte block on disc
+        ret = runCmdWithOutput(["dd", "if=/dev/zero", "of=" + initA.dev,
+                                "bs=512", "skip=1", "count=1"])
         self.assertEqual(ret.result, 0)
     
     def test07NonReservationHolderDoesNotHaveAccess(self):
         """Non-Reservation Holders do not have Write Access to the target"""
-        dprint("test07 ...")
-        # hostA get reservation
-        res = Reserve(hostA, ProutType.WriteExclusive)
+        # initA get reservation
+        res = reserve(initA, ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
-        resvnA = getReservation(hostA)
-        self.assertEqual(resvnA.key, hostA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutType.WriteExclusive)
-        # hostB can read from disk to /dev/null
-        ret = runSshCmdWithOutput(hostB,
-                                   ["dd", "if=" + hostB.dev, "of=/dev/null",
-                                    "bs=512", "count=1"])
+        resvnA = getReservation(initA)
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        # initB can read from disk to /dev/null
+        ret = runCmdWithOutput(["dd", "if=" + initB.dev, "of=/dev/null",
+                                "bs=512", "count=1"])
         self.assertEqual(ret.result, 0)
-        # hostB can't write from /dev/zero to 2nd 512-byte block on disc
-        ret = runSshCmdWithOutput(hostB,
-                                   ["dd", "if=/dev/zero", "of=" + hostB.dev,
-                                    "bs=512", "skip=1", "count=1"])
+        # initB can't write from /dev/zero to 2nd 512-byte block on disc
+        ret = runCmdWithOutput(["dd", "if=/dev/zero", "of=" + initB.dev,
+                                "bs=512", "skip=1", "count=1"])
         self.assertEqual(ret.result, 1)
     
     def tearDown(self):
         dprint("Tearing down after a RESERVE test")
-        res = Unregister(hostA)
+        res = unregister(initA)
         if res == 6:
-            Unregister(hostA)
-        res = Unregister(hostB)
+            unregister(initA)
+        res = unregister(initB)
         if res == 6:
-            Unregister(hostB)
+            unregister(initB)
+
+
+if __name__ == '__main__':
+    unittest.main()
