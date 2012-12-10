@@ -1,0 +1,36 @@
+#!/usr/bin/python
+"""
+reservation stuff for PGR testing
+"""
+
+from dprint import dprint
+from cmd import runCmdWithOutput
+
+
+# List of Reservation Types, for prout-type"""
+ProutTypes = {
+    "NoType" : "0",
+    "WriteExclusive" : "1",
+    "ExclusiveAccess" : "3",
+    "WriteExclusiveRegistrantsOnly" : "5",
+    "ExclusiveAccessRegistrantsOnly" : "6",
+    "WriteExclusiveAllRegistrants" : "7",
+    "ExclusiveAccessAllRegistrants" : "8"}
+
+
+class Reservation:
+    """Represents a reservation on a target"""
+    def __init__(self, opts):
+        self.opts = opts
+        self.key = None
+        self.rtype = None
+    def getRtypeNum(self):
+        """Get the reservation type, as a number (as a string)"""
+        ret = ProutTypes["NoType"]
+        if self.rtype == "Exclusive Access":
+            ret = ProutTypes["ExclusiveAccess"]
+        elif self.rtype == "Write Exclusive":
+            ret = ProutTypes["WriteExclusive"]
+        dprint(self.opts, "Given rtype=%s, returning Num=%s" % \
+               (self.rtype, ret))
+        return ret

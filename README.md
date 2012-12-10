@@ -41,3 +41,8 @@ Version 0.3
 This version attempts to integrate better with nosetests, and it breaks the
 test cases into smaller pieces. Also added were some sleep() steps between
 creating a reservation and trying to do I/O to test that reservation.
+
+Version 0.4
+===========
+Reorganized -- moved tests into "test" module. Reorganized into several files
+as well as a support modules.
