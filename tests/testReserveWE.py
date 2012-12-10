@@ -100,7 +100,6 @@ class Test01CanReserveWeTestCase(unittest.TestCase):
         my_resvn_setup()
 
     def testCanReserve(self):
-        """Can reserve a target for exclusive access"""
         res = initA.reserve(ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
 
@@ -114,7 +113,6 @@ class Test02CanReadWeReservationTestCase(unittest.TestCase):
         initA.reserve(ProutTypes["WriteExclusive"])
 
     def testCanReadReservationFromReserver(self):
-        """Can read WE reservation from reserving host"""
         res = initA.reserve(ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
@@ -122,7 +120,6 @@ class Test02CanReadWeReservationTestCase(unittest.TestCase):
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
 
     def testCanReadReservationFromNonReserver(self):
-        """Can read WE reservation from non-reserving host"""
         resvnB = initB.getReservation()
         self.assertEqual(resvnB.key, initA.key)
         self.assertEqual(resvnB.getRtypeNum(), ProutTypes["WriteExclusive"])
@@ -137,7 +134,6 @@ class Test03CanReleaseWeReservationTestCase(unittest.TestCase):
         initA.reserve(ProutTypes["WriteExclusive"])
 
     def testCanReleaseReservation(self):
-        """Can release a WE reservation from reserving host"""
         res = initA.reserve(ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
@@ -150,7 +146,6 @@ class Test03CanReleaseWeReservationTestCase(unittest.TestCase):
         self.assertEqual(resvnA.rtype, None)
     
     def testCannotReleaseReservation(self):
-        """Cannot release a WE reservation from non-reserving host"""
         res = initA.reserve(ProutTypes["WriteExclusive"])
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
@@ -173,7 +168,6 @@ class Test04UnregisterWeHandlingTestCase(unittest.TestCase):
         initA.reserve(ProutTypes["WriteExclusive"])
 
     def testUnregisterReleasesReservation(self):
-        """Un-registration of reserving WE host releases reservation"""
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
@@ -184,8 +178,6 @@ class Test04UnregisterWeHandlingTestCase(unittest.TestCase):
         self.assertEqual(resvnA.rtype, None)
 
     def testUnregisterDoesNotReleaseReservation(self):
-        """Un-registration of non-reserving WE host does not release
-        reservation"""
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
@@ -206,7 +198,6 @@ class Test05ReservationWeAccessTestCase(unittest.TestCase):
         initA.reserve(ProutTypes["WriteExclusive"])
 
     def testReservationHolderHasReadAccess(self):
-        """The Reservation Holder has read access to the WE target"""
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
@@ -217,7 +208,6 @@ class Test05ReservationWeAccessTestCase(unittest.TestCase):
         self.assertEqual(ret.result, 0)
 
     def testReservationHolderHasWriteAccess(self):
-        """The Reservation Holder has write access to the WE target"""
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
@@ -228,7 +218,6 @@ class Test05ReservationWeAccessTestCase(unittest.TestCase):
         self.assertEqual(ret.result, 0)
     
     def testNonReservationHolderDoesHaveReadAccess(self):
-        """Non-Reservation Holders have read access to the WE target"""
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
@@ -237,10 +226,8 @@ class Test05ReservationWeAccessTestCase(unittest.TestCase):
         ret = runCmdWithOutput(["dd", "if=" + initB.dev, "of=/dev/null",
                                 "bs=512", "count=1"], Opts)
         self.assertEqual(ret.result, 0)
-
         
     def testNonReservationHolderDoesNotHaveWriteAccess(self):
-        """Non-Reservation Holders do not have write access to the WE target"""
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)

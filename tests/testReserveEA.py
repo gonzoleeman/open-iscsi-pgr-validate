@@ -99,7 +99,6 @@ class Test01CanReserveEaTestCase(unittest.TestCase):
         my_resvn_setup()
 
     def testCanReserveEa(self):
-        """Can reserve a target for exclusive access"""
         res = initA.reserve(ProutTypes["ExclusiveAccess"])
         self.assertEqual(res, 0)
 
@@ -113,13 +112,11 @@ class Test02CanReadEaReservationTestCase(unittest.TestCase):
         initA.reserve(ProutTypes["ExclusiveAccess"])
 
     def testCanReadReservationFromReserver(self):
-        """Can read EA reservation from reserving host"""
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
  
     def testCanReadReservationFromNonReserver(self):
-        """Can read EA reservation from non-reserving host"""
         resvnB = initB.getReservation()
         self.assertEqual(resvnB.key, initA.key)
         self.assertEqual(resvnB.getRtypeNum(), ProutTypes["ExclusiveAccess"])
@@ -134,7 +131,6 @@ class Test03CanReleseEaReservationTestCase(unittest.TestCase):
         initA.reserve(ProutTypes["ExclusiveAccess"])
 
     def testCanReleaseReservation(self):
-        """Can release EA reservation from reserving host"""
         time.sleep(2)
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
@@ -146,7 +142,6 @@ class Test03CanReleseEaReservationTestCase(unittest.TestCase):
         self.assertEqual(resvnA.rtype, None)
     
     def testCannotReleaseReservation(self):
-        """Cannot release EA reservation from non-reserving host"""
         time.sleep(2)
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
@@ -168,7 +163,6 @@ class Test04UnregisterEaHandlingTestCase(unittest.TestCase):
         initA.reserve(ProutTypes["ExclusiveAccess"])
 
     def testUnregisterReleasesReservation(self):
-        """Un-registration of reserving EA host releases reservation"""
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
@@ -179,8 +173,6 @@ class Test04UnregisterEaHandlingTestCase(unittest.TestCase):
         self.assertEqual(resvnA.rtype, None)
 
     def testUnregisterDoesNotReleaseReservation(self):
-        """Un-registration of non-reserving EA host does not release
-        reservation"""
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
@@ -201,7 +193,6 @@ class Test05ReservationEaAccessTestCase(unittest.TestCase):
         initA.reserve(ProutTypes["ExclusiveAccess"])
 
     def testReservationHolderHasReadAccess(self):
-        """The Reservation Holder has Read Access to EA target"""
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
@@ -212,7 +203,6 @@ class Test05ReservationEaAccessTestCase(unittest.TestCase):
         self.assertEqual(ret.result, 0)
         
     def testReservationHolderHasWriteAccess(self):
-        """The Reservation Holder has Write Access to EA target"""
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
@@ -223,7 +213,6 @@ class Test05ReservationEaAccessTestCase(unittest.TestCase):
         self.assertEqual(ret.result, 0)
     
     def testNonReservationHolderDoesNotHaveReadAccess(self):
-        """Non-Reservation Holders do not have read access to EA target"""
         time.sleep(2)                   # give I/O time to sync up
         # initA get reservation
         resvnA = initA.getReservation()
@@ -235,7 +224,6 @@ class Test05ReservationEaAccessTestCase(unittest.TestCase):
         self.assertEqual(ret.result, 1)
 
     def testNonReservationHolderDoesNotHaveWriteAccess(self):
-        """Non-Reservation Holders do not have write access to EA target"""
         time.sleep(2)                   # give I/O time to sync up
         # initA get reservation
         resvnA = initA.getReservation()

@@ -88,12 +88,10 @@ class Test01CanRegisterTestCase(unittest.TestCase):
         initB.clear()
 
     def testCanRegisterInitA(self):
-        """Can register Initiator A"""
         resA = initA.register()
         self.assertEqual(resA, 0)
 
     def testCanRegisterInitB(self):
-        """Can register Initiator B"""
         resB = initB.register()
         self.assertEqual(resB, 0)
 
@@ -104,17 +102,14 @@ class Test02CanSeeRegistrationsTestCase(unittest.TestCase):
     """Can see initiator registration"""
 
     def setUp(self):
-        """Set up for tests"""
         res = initA.clear()
         res = initB.clear()
 
     def testCanSeeNoRegistrations(self):
-        """Can read and see no registrations when there are none"""
         registrantsA = initA.getRegistrants()
         self.assertEqual(len(registrantsA), 0)
 
     def testCanSeeRegistration(self):
-        """Can see registration from same initiator"""
         res = initA.register()
         self.assertEqual(res, 0)
         res = initB.register()
@@ -125,7 +120,6 @@ class Test02CanSeeRegistrationsTestCase(unittest.TestCase):
         self.assertEqual(registrantsA[1], initB.key)
 
     def testCanSeeRegOnDifferentInit(self):
-        """Can see registration from another initiator"""
         resA = initA.register()
         self.assertEqual(resA, 0)
         registrantsB = initB.getRegistrants()
@@ -138,14 +132,12 @@ class Test03CanUnregisterTestCase(unittest.TestCase):
     """Can Unregister"""
 
     def setUp(self):
-        """Set up for tests"""
         initA.clear()
         initB.clear()
         initA.register()
         initB.register()
 
     def testCanUnregister(self):
-        """Can unregister hosts"""
         res = initA.unregister()
         self.assertEqual(res, 0)
         registrants = initA.getRegistrants()
@@ -162,14 +154,12 @@ class Test04ReregistrationFailsTestCase(unittest.TestCase):
     """Cannot reregister"""
 
     def setUp(self):
-        """Set up for tests"""
         initA.clear()
         initB.clear()
         initA.register()
         initB.register()
 
     def testReregisterFails(self):
-        """Cannot re-register"""
         initAcopy = copy.copy(initA)
         initAcopy.key = "0x1"
         resA = initAcopy.register()
@@ -186,14 +176,12 @@ class Test05RegisterAndIgnoreTestCase(unittest.TestCase):
     """Can Register And Ignore"""
 
     def setUp(self):
-        """Set up for tests"""
         initA.clear()
         initB.clear()
         initA.register()
         initB.register()
 
     def testCanRegisterAndIgnore(self):
-        """Can register and ignore existing registrantion"""
         # register with key "0x1"
         initAcopy = copy.copy(initA)
         initAcopy.key = "0x1"
