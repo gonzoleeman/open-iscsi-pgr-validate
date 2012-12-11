@@ -92,7 +92,7 @@ def my_resvn_setup():
 
 ################################################################
 
-class Test01CanReserveEaTestCase(unittest.TestCase):
+class TC01CanReserveEaTestCase(unittest.TestCase):
     """Test that PGR RESERVE Exclusive Access can be set"""
 
     def setUp(self):
@@ -104,7 +104,7 @@ class Test01CanReserveEaTestCase(unittest.TestCase):
 
 ################################################################
 
-class Test02CanReadEaReservationTestCase(unittest.TestCase):
+class TC02CanReadEaReservationTestCase(unittest.TestCase):
     """Test that PGR RESERVE Exclusive Access can be read"""
 
     def setUp(self):
@@ -123,7 +123,7 @@ class Test02CanReadEaReservationTestCase(unittest.TestCase):
 
 ################################################################
 
-class Test03CanReleseEaReservationTestCase(unittest.TestCase):
+class TC03CanReleseEaReservationTestCase(unittest.TestCase):
     """Test that PGR RESERVE Exclusive Access can be released"""
 
     def setUp(self):
@@ -154,7 +154,7 @@ class Test03CanReleseEaReservationTestCase(unittest.TestCase):
 
 ################################################################
 
-class Test04UnregisterEaHandlingTestCase(unittest.TestCase):
+class TC04UnregisterEaHandlingTestCase(unittest.TestCase):
     """Test how PGR RESERVE Exclusive Access reservation is handled
     during unregistration"""
 
@@ -184,7 +184,7 @@ class Test04UnregisterEaHandlingTestCase(unittest.TestCase):
 
 ################################################################
 
-class Test05ReservationEaAccessTestCase(unittest.TestCase):
+class TC05ReservationEaAccessTestCase(unittest.TestCase):
     """Test how PGR RESERVE Exclusive Access reservation acccess is
     handled"""
 
@@ -198,8 +198,13 @@ class Test05ReservationEaAccessTestCase(unittest.TestCase):
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
         # initA read from disk to /dev/null
-        ret = runCmdWithOutput(["dd", "if=" + initA.dev, "of=/dev/null",
-                                "bs=512", "count=1"], Opts)
+        ret = runCmdWithOutput(["dd",
+                                "if=" + initA.dev,
+                                "iflag=direct",
+                                "of=/dev/null",
+                                "bs=512",
+                                "count=1"],
+                               Opts)
         self.assertEqual(ret.result, 0)
         
     def testReservationHolderHasWriteAccess(self):
@@ -208,8 +213,14 @@ class Test05ReservationEaAccessTestCase(unittest.TestCase):
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
         # initA can write from /dev/zero to 2nd 512-byte block on disc
-        ret = runCmdWithOutput(["dd", "if=/dev/zero", "of=" + initA.dev,
-                                "bs=512", "seek=1", "count=1"], Opts)
+        ret = runCmdWithOutput(["dd",
+                                "if=/dev/zero",
+                                "of=" + initA.dev,
+                                "oflag=direct",
+                                "bs=512",
+                                "seek=1",
+                                "count=1"],
+                               Opts)
         self.assertEqual(ret.result, 0)
     
     def testNonReservationHolderDoesNotHaveReadAccess(self):
@@ -219,8 +230,13 @@ class Test05ReservationEaAccessTestCase(unittest.TestCase):
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
         # initB can't read from disk to /dev/null
-        ret = runCmdWithOutput(["dd", "if=" + initB.dev, "of=/dev/null",
-                                "bs=512", "count=1"], Opts)
+        ret = runCmdWithOutput(["dd",
+                                "if=" + initB.dev,
+                                "iflag=direct",
+                                "of=/dev/null",
+                                "bs=512",
+                                "count=1"],
+                               Opts)
         self.assertEqual(ret.result, 1)
 
     def testNonReservationHolderDoesNotHaveWriteAccess(self):
@@ -230,6 +246,12 @@ class Test05ReservationEaAccessTestCase(unittest.TestCase):
         self.assertEqual(resvnA.key, initA.key)
         self.assertEqual(resvnA.getRtypeNum(), ProutTypes["ExclusiveAccess"])
         # initB can't write from /dev/zero to 2nd 512-byte block on disc
-        ret = runCmdWithOutput(["dd", "if=/dev/zero", "of=" + initB.dev,
-                                "bs=512", "seek=1", "count=1"], Opts)
+        ret = runCmdWithOutput(["dd",
+                                "if=/dev/zero",
+                                "of=" + initB.dev,
+                                "oflag=direct",
+                                "bs=512",
+                                "seek=1",
+                                "count=1"],
+                               Opts)
         self.assertEqual(ret.result, 1)

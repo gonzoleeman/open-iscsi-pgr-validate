@@ -79,7 +79,7 @@ def setUpModule():
 ################################################################
 
 
-class Test01CanRegisterTestCase(unittest.TestCase):
+class TC01CanRegisterTestCase(unittest.TestCase):
     """Can register initiators"""
 
     def setUp(self):
@@ -98,7 +98,7 @@ class Test01CanRegisterTestCase(unittest.TestCase):
 
 ################################################################
 
-class Test02CanSeeRegistrationsTestCase(unittest.TestCase):
+class TC02CanSeeRegistrationsTestCase(unittest.TestCase):
     """Can see initiator registration"""
 
     def setUp(self):
@@ -128,7 +128,7 @@ class Test02CanSeeRegistrationsTestCase(unittest.TestCase):
 
 ################################################################
 
-class Test03CanUnregisterTestCase(unittest.TestCase):
+class TC03CanUnregisterTestCase(unittest.TestCase):
     """Can Unregister"""
 
     def setUp(self):
@@ -150,7 +150,7 @@ class Test03CanUnregisterTestCase(unittest.TestCase):
 
 ################################################################
 
-class Test04ReregistrationFailsTestCase(unittest.TestCase):
+class TC04ReregistrationFailsTestCase(unittest.TestCase):
     """Cannot reregister"""
 
     def setUp(self):
@@ -172,7 +172,7 @@ class Test04ReregistrationFailsTestCase(unittest.TestCase):
 
 ################################################################
 
-class Test05RegisterAndIgnoreTestCase(unittest.TestCase):
+class TC05RegisterAndIgnoreTestCase(unittest.TestCase):
     """Can Register And Ignore"""
 
     def setUp(self):
