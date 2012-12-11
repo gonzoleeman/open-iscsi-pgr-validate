@@ -10,8 +10,7 @@ from reservation import Reservation
 
 class Initiator:
     """A General PGR initiator"""
-    def __init__(self, iface_name, dev, key, opts):
-        self.iface_name = iface_name
+    def __init__(self, dev, key, opts):
         self.dev = dev
         self.key = key
         self.opts = opts
@@ -111,3 +110,8 @@ class Initiator:
                 ret = line.split()[-1]
         dprint(self.opts, "getDiskInquirySn(%s) -> %s" % (self.dev, ret))
         return ret
+
+    def runTur(self):
+        """Clear any UA by sending TUR"""
+        res = runCmdWithOutput(["sg_turs", self.dev], self.opts)
+        return res.result

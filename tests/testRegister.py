@@ -47,8 +47,9 @@ dprint(Opts, "XXX testing at module init time ...")
 
 # XXX Fix this!
 
-initA = Initiator("t1", "/dev/sdc", "0x123abc", Opts)
-initB = Initiator("t2", "/dev/sdd", "0x696969", Opts)
+initA = Initiator("/dev/sdc", "0x123abc", Opts)
+initB = Initiator("/dev/sdd", "0x696969", Opts)
+initC = Initiator("/dev/sde", None, Opts)
 
 ################################################################
 
@@ -65,15 +66,16 @@ def setUpModule():
     # make sure all devices are the same
     iiA = initA.getDiskInquirySn()
     iiB = initB.getDiskInquirySn()
-    if not iiA or not iiB:
+    iiC = initC.getDiskInquirySn()
+    if not iiA or not iiB or not iiC:
         print >>sys.stderr, \
-              "Fatal: cannot get INQUIRY data from %s or %s\n" % \
-              (initA.dev, initB.dev)
+              "Fatal: cannot get INQUIRY data from %s, %s, or %s\n" % \
+              (initA.dev, initB.dev, initC.dev)
         sys.exit(1)
-    if iiA != iiB:
+    if iiA != iiB or iiA != iiC:
         print >>sys.stderr, \
-              "Fatal: Serial numbers differ for %s and %s\n" % \
-              (initA.dev, initB.dev)
+              "Fatal: Serial numbers differ for %s, %s, or %s\n" % \
+              (initA.dev, initB.dev, initC.dev)
         sys.exit(1)
 
 ################################################################
@@ -84,8 +86,10 @@ class TC01CanRegisterTestCase(unittest.TestCase):
 
     def setUp(self):
         """Set up for tests"""
-        initA.clear()
-        initB.clear()
+        if initA.unregister() != 0:
+            initA.unregister()
+        if initB.unregister() != 0:
+            initB.unregister()
 
     def testCanRegisterInitA(self):
         resA = initA.register()
@@ -102,14 +106,16 @@ class TC02CanSeeRegistrationsTestCase(unittest.TestCase):
     """Can see initiator registration"""
 
     def setUp(self):
-        res = initA.clear()
-        res = initB.clear()
+        if initA.unregister() != 0:
+            initA.unregister()
+        if initB.unregister() != 0:
+            initB.unregister()
 
     def testCanSeeNoRegistrations(self):
         registrantsA = initA.getRegistrants()
         self.assertEqual(len(registrantsA), 0)
 
-    def testCanSeeRegistration(self):
+    def testCanSeeRegistrationOnFirstRegistrant(self):
         res = initA.register()
         self.assertEqual(res, 0)
         res = initB.register()
@@ -119,12 +125,19 @@ class TC02CanSeeRegistrationsTestCase(unittest.TestCase):
         self.assertEqual(registrantsA[0], initA.key)
         self.assertEqual(registrantsA[1], initB.key)
 
-    def testCanSeeRegOnDifferentInit(self):
+    def testCanSeeRegOnSecondRegistrant(self):
         resA = initA.register()
         self.assertEqual(resA, 0)
         registrantsB = initB.getRegistrants()
         self.assertEqual(len(registrantsB), 1)
         self.assertEqual(registrantsB[0], initA.key)
+
+    def testCanSeeRegOnNonRegistrant(self):
+        resA = initA.register()
+        self.assertEqual(resA, 0)
+        registrantsC = initC.getRegistrants()
+        self.assertEqual(len(registrantsC), 1)
+        self.assertEqual(registrantsC[0], initA.key)
 
 ################################################################
 
@@ -132,8 +145,10 @@ class TC03CanUnregisterTestCase(unittest.TestCase):
     """Can Unregister"""
 
     def setUp(self):
-        initA.clear()
-        initB.clear()
+        if initA.unregister() != 0:
+            initA.unregister()
+        if initB.unregister() != 0:
+            initB.unregister()
         initA.register()
         initB.register()
 
@@ -147,15 +162,16 @@ class TC03CanUnregisterTestCase(unittest.TestCase):
         registrants = initB.getRegistrants()
         self.assertEqual(len(registrants), 0)
 
-
 ################################################################
 
 class TC04ReregistrationFailsTestCase(unittest.TestCase):
     """Cannot reregister"""
 
     def setUp(self):
-        initA.clear()
-        initB.clear()
+        if initA.unregister() != 0:
+            initA.unregister()
+        if initB.unregister() != 0:
+            initB.unregister()
         initA.register()
         initB.register()
 
@@ -169,15 +185,16 @@ class TC04ReregistrationFailsTestCase(unittest.TestCase):
         self.assertEqual(registrantsA[0], initA.key)
         self.assertEqual(registrantsA[1], initB.key)
 
-
 ################################################################
 
 class TC05RegisterAndIgnoreTestCase(unittest.TestCase):
     """Can Register And Ignore"""
 
     def setUp(self):
-        initA.clear()
-        initB.clear()
+        if initA.unregister() != 0:
+            initA.unregister()
+        if initB.unregister() != 0:
+            initB.unregister()
         initA.register()
         initB.register()
 
