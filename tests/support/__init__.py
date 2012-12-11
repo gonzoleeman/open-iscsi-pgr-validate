@@ -11,6 +11,9 @@ __all__ = [
     'runCmdWithOutput',
     'verifyCmdExists',
     'Initiator',
+    'initA',
+    'initB',
+    'initC'
     ]
 
 

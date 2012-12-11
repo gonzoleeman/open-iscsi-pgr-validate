@@ -31,6 +31,14 @@ class Reservation:
             ret = ProutTypes["ExclusiveAccess"]
         elif self.rtype == "Write Exclusive":
             ret = ProutTypes["WriteExclusive"]
+        elif self.rtype == "Exclusive Access, registrants only":
+            ret = ProutTypes["ExclusiveAccessRegistrantsOnly"]
+        elif self.rtype == "Write Exclusive, registrants only":
+            ret = ProutTypes["WriteExclusiveRegistrantsOnly"]
+        elif self.rtype == "Exclusive Access, all registrants":
+            ret = ProutTypes["ExclusiveAccessAllRegistrants"]
+        elif self.rtype == "Write Exclusive, all registrants":
+            ret = ProutTypes["WriteExclusiveAllRegistrants"]
         dprint(self.opts, "Given rtype=%s, returning Num=%s" % \
                (self.rtype, ret))
         return ret

@@ -3,9 +3,28 @@
 Initiator Class for testing PGR
 """
 
+import os
+
 from dprint import dprint
 from cmd import runCmdWithOutput
 from reservation import Reservation
+
+
+#
+# config stuff ...
+#
+
+################################################################
+
+# XXX Fix this -- these need to be global options
+
+# options
+class Opts:
+    pass
+
+Opts.debug = os.getenv("TR_DEBUG")
+
+################################################################
 
 
 class Initiator:
@@ -75,8 +94,9 @@ class Initiator:
         rr = Reservation(self.opts)
         if "Reservation follows" in res.lines[0]:
             rr.key = res.lines[1].split("=")[1]
-            pcs = res.lines[2].split(",")
-            rr.rtype = pcs[1].split(":")[1].strip()
+            rline = res.lines[2]
+            ridx = rline.index("type:")
+            rr.rtype = rline[ridx:].split(":")[1].strip()
             dprint(self.opts,
                    "Reservation: found key=", rr.key, "type=", rr.rtype)
         else:
@@ -115,3 +135,12 @@ class Initiator:
         """Clear any UA by sending TUR"""
         res = runCmdWithOutput(["sg_turs", self.dev], self.opts)
         return res.result
+
+#
+# For all to use
+#
+
+initA = Initiator("/dev/sdc", "0x123abc", Opts)
+initB = Initiator("/dev/sdd", "0x696969", Opts)
+initC = Initiator("/dev/sde", None, Opts)
+

@@ -20,7 +20,7 @@ import time
 
 import unittest
 
-from support.initiator import Initiator
+from support.initiator import initA, initB, initC
 from support.dprint import dprint
 from support.cmd import verifyCmdExists, runCmdWithOutput
 from support.reservation import ProutTypes, Reservation
@@ -38,22 +38,6 @@ class Opts:
     pass
 
 Opts.debug = os.getenv("TR_DEBUG")
-
-################################################################
-
-
-#
-# our 2 initiators
-#
-# these are set up statically and must be created manually ahead
-# of time
-#
-
-# XXX Fix this!
-
-initA = Initiator("/dev/sdc", "0x123abc", Opts)
-initB = Initiator("/dev/sdd", "0x696969", Opts)
-initC = Initiator("/dev/sdd", None, Opts)
 
 ################################################################
 
@@ -101,9 +85,10 @@ class TC01CanReserveWeTestCase(unittest.TestCase):
 
     def setUp(self):
         my_resvn_setup()
+        self.rtype = ProutTypes["WriteExclusive"]
 
     def testCanReserve(self):
-        res = initA.reserve(ProutTypes["WriteExclusive"])
+        res = initA.reserve(self.rtype)
         self.assertEqual(res, 0)
 
 ################################################################
@@ -113,24 +98,23 @@ class TC02CanReadWeReservationTestCase(unittest.TestCase):
 
     def setUp(self):
         my_resvn_setup()
-        initA.reserve(ProutTypes["WriteExclusive"])
+        self.rtype = ProutTypes["WriteExclusive"]
+        initA.reserve(self.rtype)
 
     def testCanReadReservationFromReserver(self):
-        res = initA.reserve(ProutTypes["WriteExclusive"])
-        self.assertEqual(res, 0)
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
 
     def testCanReadReservationFromNonReserver(self):
         resvnB = initB.getReservation()
         self.assertEqual(resvnB.key, initA.key)
-        self.assertEqual(resvnB.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnB.getRtypeNum(), self.rtype)
 
     def testCanReadReservationFromNonRegistrant(self):
         resvnC = initC.getReservation()
         self.assertEqual(resvnC.key, initA.key)
-        self.assertEqual(resvnC.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnC.getRtypeNum(), self.rtype)
 
 ################################################################
 
@@ -139,31 +123,28 @@ class TC03CanReleaseWeReservationTestCase(unittest.TestCase):
 
     def setUp(self):
         my_resvn_setup()
-        initA.reserve(ProutTypes["WriteExclusive"])
+        self.rtype = ProutTypes["WriteExclusive"]
+        initA.reserve(self.rtype)
 
     def testReservationHolderCanReleaseReservation(self):
-        res = initA.reserve(ProutTypes["WriteExclusive"])
-        self.assertEqual(res, 0)
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
-        res = initA.release(ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
+        res = initA.release(self.rtype)
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, None)
         self.assertEqual(resvnA.rtype, None)
     
     def testNonReservationHolderCannotReleaseReservation(self):
-        res = initA.reserve(ProutTypes["WriteExclusive"])
+        resvnA = initA.getReservation()
+        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
+        res = initB.release(self.rtype)
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
-        res = initB.release(ProutTypes["WriteExclusive"])
-        self.assertEqual(res, 0)
-        resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
 
 ################################################################
 
@@ -173,12 +154,13 @@ class TC04UnregisterWeHandlingTestCase(unittest.TestCase):
 
     def setUp(self):
         my_resvn_setup()
-        initA.reserve(ProutTypes["WriteExclusive"])
+        self.rtype = ProutTypes["WriteExclusive"]
+        initA.reserve(self.rtype)
 
     def testReservationHolderUnregisterReleasesReservation(self):
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
         res = initA.unregister()
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
@@ -188,12 +170,12 @@ class TC04UnregisterWeHandlingTestCase(unittest.TestCase):
     def testNoneReservationHolderUnregisterDoesNotReleaseReservation(self):
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
         res = initB.unregister()
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
 
 ################################################################
 
@@ -203,13 +185,14 @@ class TC05ReservationWeAccessTestCase(unittest.TestCase):
 
     def setUp(self):
         my_resvn_setup()
-        initA.reserve(ProutTypes["WriteExclusive"])
+        self.rtype = ProutTypes["WriteExclusive"]
+        initA.reserve(self.rtype)
 
     def testReservationHolderHasReadAccess(self):
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
         # initA read from disk to /dev/null
         ret = runCmdWithOutput(["dd",
                                 "if=" + initA.dev,
@@ -224,7 +207,7 @@ class TC05ReservationWeAccessTestCase(unittest.TestCase):
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
         # initA write from /dev/zero to 2nd 512-byte block on disc
         ret = runCmdWithOutput(["dd",
                                 "if=/dev/zero",
@@ -240,7 +223,7 @@ class TC05ReservationWeAccessTestCase(unittest.TestCase):
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
         # initB can read from disk to /dev/null
         ret = runCmdWithOutput(["dd",
                                 "if=" + initB.dev,
@@ -255,7 +238,7 @@ class TC05ReservationWeAccessTestCase(unittest.TestCase):
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
         # initB can't write from /dev/zero to 2nd 512-byte block on disc
         ret = runCmdWithOutput(["dd",
                                 "if=/dev/zero",
@@ -271,7 +254,7 @@ class TC05ReservationWeAccessTestCase(unittest.TestCase):
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
         # initC can read from disk to /dev/null
         ret = runCmdWithOutput(["dd",
                                 "if=" + initC.dev,
@@ -286,7 +269,7 @@ class TC05ReservationWeAccessTestCase(unittest.TestCase):
         time.sleep(2)                   # give I/O time to sync up
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), ProutTypes["WriteExclusive"])
+        self.assertEqual(resvnA.getRtypeNum(), self.rtype)
         # initC can't write from /dev/zero to 2nd 512-byte block on disc
         ret = runCmdWithOutput(["dd",
                                 "if=/dev/zero",
