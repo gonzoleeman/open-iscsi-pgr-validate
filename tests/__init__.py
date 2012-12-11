@@ -10,4 +10,6 @@ __all__ = [
     "testRegistration",
     "testReserveEA",
     "testReserveWE",
+    "testReserveEARO",
+    "testReserveWERO",
     ]
