@@ -46,3 +46,8 @@ Version 0.4
 ===========
 Reorganized -- moved tests into "test" module. Reorganized into several files
 as well as a support modules.
+
+Version 0.5
+===========
+Fixed problem with "dd": now using DIRECT I/O. All tests passing with iscsitarget
+target. Added in use of a third, non-registrant initiator.

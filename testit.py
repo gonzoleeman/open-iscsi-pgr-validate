@@ -29,7 +29,7 @@ TODO
 """
 
 
-__version__ = "Version 0.3"
+__version__ = "Version 0.5"
 __author__ = "Lee Duncan <leeman.duncan@gmail.com>"
 
 
