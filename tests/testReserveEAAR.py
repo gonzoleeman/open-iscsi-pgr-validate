@@ -3,7 +3,7 @@
 Python tests for SCSI-3 Persistent Group Reservations
 
 Description:
- This module tests Exclusive Access Registrants Only Reservations.
+ This module tests Exclusive Access All Registrants Reservations.
 
  See ... for more details.
 
@@ -24,7 +24,8 @@ from support.initiator import initA, initB, initC
 from support.reservation import ProutTypes
 from support.setup import set_up_module
 
-my_rtype = ProutTypes["ExclusiveAccessRegistrantsOnly"]
+my_rtype = ProutTypes["ExclusiveAccessAllRegistrants"]
+ar_key = "0x0"
 
 ################################################################
 
@@ -67,17 +68,17 @@ class test02CanReadReservationTestCase(unittest.TestCase):
 
     def testCanReadReservationFromReserver(self):
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
  
     def testCanReadReservationFromNonReserver(self):
         resvnB = initB.getReservation()
-        self.assertEqual(resvnB.key, initA.key)
+        self.assertEqual(resvnB.key, ar_key)
         self.assertEqual(resvnB.getRtypeNum(), my_rtype)
 
     def testCanReadReservationFromNonRegistrant(self):
         resvnC = initC.getReservation()
-        self.assertEqual(resvnC.key, initA.key)
+        self.assertEqual(resvnC.key, ar_key)
         self.assertEqual(resvnC.getRtypeNum(), my_rtype)
 
 ################################################################
@@ -90,9 +91,9 @@ class test03CanReleseReservationTestCase(unittest.TestCase):
         initA.reserve(my_rtype)
         time.sleep(2)                   # give I/O time to sync up
 
-    def testCanReleaseReservation(self):
+    def testMainHolderCanReleaseReservation(self):
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         res = initA.release(my_rtype)
         self.assertEqual(res, 0)
@@ -100,15 +101,15 @@ class test03CanReleseReservationTestCase(unittest.TestCase):
         self.assertEqual(resvnA.key, None)
         self.assertEqual(resvnA.rtype, None)
     
-    def testCannotReleaseReservation(self):
+    def testAltHolderCanReleaseReservation(self):
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         res = initB.release(my_rtype)
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
-        self.assertEqual(resvnA.getRtypeNum(), my_rtype)
+        self.assertEqual(resvnA.key, None)
+        self.assertEqual(resvnA.rtype, None)
 
 ################################################################
 
@@ -120,24 +121,24 @@ class test04UnregisterHandlingTestCase(unittest.TestCase):
         my_resvn_setup()
         initA.reserve(my_rtype)
 
-    def testUnregisterReleasesReservation(self):
+    def testMainHolderUnregisterDoesNotReleasesReservation(self):
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         res = initA.unregister()
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, None)
-        self.assertEqual(resvnA.rtype, None)
+        self.assertEqual(resvnA.key, ar_key)
+        self.assertEqual(resvnA.getRtypeNum(), my_rtype)
 
-    def testUnregisterDoesNotReleaseReservation(self):
+    def testAltHolderUnregisterDoesNotReleaseReservation(self):
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         res = initB.unregister()
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
 
 ################################################################
@@ -153,7 +154,7 @@ class test05ReservationAccessTestCase(unittest.TestCase):
 
     def testReservationHolderHasReadAccess(self):
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         # initA read from disk to /dev/null
         ret = initA.readFromTarget()
@@ -161,7 +162,7 @@ class test05ReservationAccessTestCase(unittest.TestCase):
         
     def testReservationHolderHasWriteAccess(self):
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         # initA can write from /dev/zero to 2nd 512-byte block on disc
         ret = initA.writeToTarget()
@@ -170,7 +171,7 @@ class test05ReservationAccessTestCase(unittest.TestCase):
     def testAltReservationHolderDoesHaveReadAccess(self):
         # initA get reservation
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         # initB can't read from disk to /dev/null
         ret = initB.readFromTarget()
@@ -179,7 +180,7 @@ class test05ReservationAccessTestCase(unittest.TestCase):
     def testAltReservationHolderDoesHaveWriteAccess(self):
         # initA get reservation
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         # initB can't write from /dev/zero to 2nd 512-byte block on disc
         ret = initB.writeToTarget()
@@ -188,7 +189,7 @@ class test05ReservationAccessTestCase(unittest.TestCase):
     def testNonRegistrantDoesNotHaveReadAccess(self):
         # initA get reservation
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         # initC can't read from disk to /dev/null
         ret = initC.readFromTarget()
@@ -197,7 +198,7 @@ class test05ReservationAccessTestCase(unittest.TestCase):
     def testNonRegistrantDoesNotHaveWriteAccess(self):
         # initA get reservation
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, initA.key)
+        self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         # initC can't write from /dev/zero to 2nd 512-byte block on disc
         ret = initC.writeToTarget()

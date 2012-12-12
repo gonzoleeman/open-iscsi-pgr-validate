@@ -37,7 +37,7 @@ class Initiator:
     def runSgCmdWithOutput(self, cmd):
         """Run the SG command on specified host"""
         my_cmd = ["sg_persist", "-n"] + cmd + [self.dev]
-        return runCmdWithOutput(my_cmd, self.opts)
+        return runCmdWithOutput(my_cmd)
 
     def getRegistrants(self):
         """Get list of registrants using specified initiator"""
@@ -122,7 +122,7 @@ class Initiator:
 
     def getDiskInquirySn(self):
         """Get the Disk Serial Number"""
-        res = runCmdWithOutput(["sg_inq", self.dev], self.opts)
+        res = runCmdWithOutput(["sg_inq", self.dev])
         ret = None
         if res.result == 0:
             if "Unit serial number" in res.lines[-1]:
@@ -133,8 +133,29 @@ class Initiator:
 
     def runTur(self):
         """Clear any UA by sending TUR"""
-        res = runCmdWithOutput(["sg_turs", self.dev], self.opts)
+        res = runCmdWithOutput(["sg_turs", self.dev])
         return res.result
+
+    def readFromTarget(self):
+        """See if we can read from the target"""
+        return runCmdWithOutput(["dd",
+                                 "if=" + self.dev,
+                                 "iflag=direct",
+                                 "of=/dev/null",
+                                 "skip=1",
+                                 "bs=512",
+                                 "count=1"])
+        
+    def writeToTarget(self):
+        """See if we can write to the target (destructive!) """
+        return runCmdWithOutput(["dd",
+                                 "if=/dev/zero",
+                                 "of=" + self.dev,
+                                 "oflag=direct",
+                                 "bs=512",
+                                 "skip=1",
+                                 "seek=1",
+                                 "count=1"])
 
 #
 # For all to use

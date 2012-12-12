@@ -13,7 +13,8 @@ __all__ = [
     'Initiator',
     'initA',
     'initB',
-    'initC'
+    'initC',
+    'set_up_module',
     ]
 
 

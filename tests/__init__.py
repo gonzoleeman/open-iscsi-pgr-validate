@@ -3,7 +3,7 @@
 Module-level setup
 """
 
-__version__ = "Version 0.5"
+__version__ = "Version 0.6"
 __author__ = "Lee Duncan <leeman.duncan@gmail.com>"
 
 __all__ = [
@@ -12,4 +12,6 @@ __all__ = [
     "testReserveWE",
     "testReserveEARO",
     "testReserveWERO",
+    "testReserveEAAR",
+    "testReserveWEAR",
     ]

@@ -16,80 +16,35 @@ __author__ = "Lee Duncan <leeman.duncan@gmail.com>"
 
 import sys
 import os
-import copy
-
+from copy import copy
 import unittest
 
-from support.initiator import Initiator
-from support.dprint import dprint
-from support.cmd import verifyCmdExists
+from support.initiator import Initiator, initA, initB, initC
+from support.setup import set_up_module
 
 ################################################################
-
-# XXX Fix this -- these need to be global options
-
-# options
-class Opts:
-    pass
-
-Opts.debug = os.getenv("TR_DEBUG", False)
-
-dprint(Opts, "XXX testing at module init time ...")
-
-################################################################
-
-#
-# our 2 initiators
-#
-# these are set up statically and must be created manually ahead
-# of time
-#
-
-# XXX Fix this!
-
-initA = Initiator("/dev/sdc", "0x123abc", Opts)
-initB = Initiator("/dev/sdd", "0x696969", Opts)
-initC = Initiator("/dev/sde", None, Opts)
-
-################################################################
-
 
 def setUpModule():
-    """Whole-module setup -- not yet used?"""
-    dprint(Opts, "Module-level setup ...")
-    if os.geteuid() != 0:
-        print >>sys.stderr, "Fatal: must be root to run this script\n"
-        sys.exit(1)
-    verifyCmdExists(["sg_persist", "-V"], Opts)
-    verifyCmdExists(["sg_inq", "-V"], Opts)
-    verifyCmdExists(["dd", "--version"], Opts)
-    # make sure all devices are the same
-    iiA = initA.getDiskInquirySn()
-    iiB = initB.getDiskInquirySn()
-    iiC = initC.getDiskInquirySn()
-    if not iiA or not iiB or not iiC:
-        print >>sys.stderr, \
-              "Fatal: cannot get INQUIRY data from %s, %s, or %s\n" % \
-              (initA.dev, initB.dev, initC.dev)
-        sys.exit(1)
-    if iiA != iiB or iiA != iiC:
-        print >>sys.stderr, \
-              "Fatal: Serial numbers differ for %s, %s, or %s\n" % \
-              (initA.dev, initB.dev, initC.dev)
-        sys.exit(1)
+    """Whole-module setup"""
+    set_up_module(initA, initB, initC)
 
 ################################################################
 
+def my_reg_setup():
+    """make sure we are all setup to test reservations"""
+    if initA.unregister() != 0:
+        initA.unregister()
+    if initB.unregister() != 0:
+        initB.unregister()
+    initC.runTur()
 
-class TC01CanRegisterTestCase(unittest.TestCase):
+################################################################
+
+class test01CanRegisterTestCase(unittest.TestCase):
     """Can register initiators"""
 
     def setUp(self):
-        """Set up for tests"""
-        if initA.unregister() != 0:
-            initA.unregister()
-        if initB.unregister() != 0:
-            initB.unregister()
+        my_reg_setup()
 
     def testCanRegisterInitA(self):
         resA = initA.register()
@@ -99,17 +54,13 @@ class TC01CanRegisterTestCase(unittest.TestCase):
         resB = initB.register()
         self.assertEqual(resB, 0)
 
-
 ################################################################
 
-class TC02CanSeeRegistrationsTestCase(unittest.TestCase):
+class test02CanSeeRegistrationsTestCase(unittest.TestCase):
     """Can see initiator registration"""
 
     def setUp(self):
-        if initA.unregister() != 0:
-            initA.unregister()
-        if initB.unregister() != 0:
-            initB.unregister()
+        my_reg_setup()
 
     def testCanSeeNoRegistrations(self):
         registrantsA = initA.getRegistrants()
@@ -141,14 +92,11 @@ class TC02CanSeeRegistrationsTestCase(unittest.TestCase):
 
 ################################################################
 
-class TC03CanUnregisterTestCase(unittest.TestCase):
+class test03CanUnregisterTestCase(unittest.TestCase):
     """Can Unregister"""
 
     def setUp(self):
-        if initA.unregister() != 0:
-            initA.unregister()
-        if initB.unregister() != 0:
-            initB.unregister()
+        my_reg_setup()
         initA.register()
         initB.register()
 
@@ -164,19 +112,16 @@ class TC03CanUnregisterTestCase(unittest.TestCase):
 
 ################################################################
 
-class TC04ReregistrationFailsTestCase(unittest.TestCase):
+class test04ReregistrationFailsTestCase(unittest.TestCase):
     """Cannot reregister"""
 
     def setUp(self):
-        if initA.unregister() != 0:
-            initA.unregister()
-        if initB.unregister() != 0:
-            initB.unregister()
+        my_reg_setup()
         initA.register()
         initB.register()
 
     def testReregisterFails(self):
-        initAcopy = copy.copy(initA)
+        initAcopy = copy(initA)
         initAcopy.key = "0x1"
         resA = initAcopy.register()
         self.assertNotEqual(resA, 0)
@@ -187,20 +132,17 @@ class TC04ReregistrationFailsTestCase(unittest.TestCase):
 
 ################################################################
 
-class TC05RegisterAndIgnoreTestCase(unittest.TestCase):
+class test05RegisterAndIgnoreTestCase(unittest.TestCase):
     """Can Register And Ignore"""
 
     def setUp(self):
-        if initA.unregister() != 0:
-            initA.unregister()
-        if initB.unregister() != 0:
-            initB.unregister()
+        my_reg_setup()
         initA.register()
         initB.register()
 
     def testCanRegisterAndIgnore(self):
         # register with key "0x1"
-        initAcopy = copy.copy(initA)
+        initAcopy = copy(initA)
         initAcopy.key = "0x1"
         result = initA.registerAndIgnore(initAcopy.key)
         self.assertEqual(result, 0)
