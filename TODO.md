@@ -5,3 +5,8 @@ To Do List for PGR testing
   when done?)
 
 * Use libiscsi to get away from open-iscsi setup?
+
+* Test less obvious features, such as:
+    - report-capabilities
+    - preempt
+    - clear
