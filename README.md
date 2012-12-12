@@ -1,62 +1,59 @@
-open-iscsi-pgr-validate
-=======================
+iSCSI/SCSI-3 Persistent Group Reservations Test Suite
+=====================================================
+This package is a test suite for SCSI-3 Persistent Group Reservations
+(PGR) using an iSCSI transport. This project grew out of a need to
+verify PGR functionality after a search for such functionality turned
+up nothing.
 
-Test suite that validates correct iSCSI Persistent Group Reservations
+This test suite uses Python and the nose testing package, which
+is built on the built-in unittest testing package.
 
+You must have 3 local devices that all point to the same iSCSI
+target. This can be done, for example, using open-iscsi, by
+setting up three different interface files for that target,
+and logging on to the target (in the iSCSI sense) through each
+of those three interfaces.
 
+Set Up
+======
+Here is how to set things up using open-iscsi on SLE 11 SP2.
 
-Version 0.1
-===========
-First version. This one requires 2 or 3 hosts talking to a SCSI
-target, so it does not require iSCSI at all, but it does require ssh
-root password- less access to all systems, so it is a pain to set up.
+Create these three interface files:
 
-Development was done on openSUSE 12.2, using iscsitarget as the target
-and open-iscsi as the initiators. The alternate hosts were running SLE
-11 SP2.
+File /etc/iscsi/iface/t1:
 
-To run these tests, use the "nose" package:
+    iface.transport_name = tcp
+    iface.initiatorname = iqn.2003-04.net.gonzoleeman:test11
+    iface.net_ifacename = eth0
 
-    zsh# nosetests -v
+File /etc/iscsi/iface/t2:
 
-There are two "switches", which are hard-coded in the source file:
-"debug", and "three_way". Set "debug" to True to spew volumes of debug
-messages, and set "three_way" to True to enable using 3 hosts instead
-of 2.
+    iface.transport_name = tcp
+    iface.initiatorname = iqn.2003-04.net.gonzoleeman:test12
+    iface.net_ifacename = eth0
 
-The only test file is testReserve.py, which has a description of the
-hardware setup required to use it.
+File /etc/iscsi/iface/t3:
 
+    iface.transport_name = tcp
+    iface.initiatorname = iqn.2003-04.net.gonzoleeman:test13
+    iface.net_ifacename = eth0
 
-Version 0.2
-===========
-Updated to use the interface ("iface") feature of open-iscsi to send
-from multiple iSCSI initiators on a single host. This requires
-open-iscsi and and iSCSI target, but only requires a single host.
+Set up your target at IP address TARGET_IP_ADDR.
 
-Development is being done on SLE 11 SP2, since the "iface" feature of
-open- iscsi works from here and does not seem to work from openSUSE
-12.2 open-iscsi.  The target is still using iscsitarget on openSUSE
-12.2 for initial development.
+Then run:
 
-Version 0.3
-===========
-This version attempts to integrate better with nosetests, and it
-breaks the test cases into smaller pieces. Also added were some
-sleep() steps between creating a reservation and trying to do I/O to
-test that reservation.
+    # iscsiadm -m discovery -t st -p TARGET_IP_ADDR -I t1 -l
+    ... (output from iscsiadm -- 3 lines)
+    # iscsiadm -m discovery -t st -p TARGET_IP_ADDR -I t2 -l
+    ... (output from iscsiadm -- 3 lines)
+    # iscsiadm -m discovery -t st -p TARGET_IP_ADDR -I t3 -l
+    ... (output from iscsiadm -- 3 lines)
 
-Version 0.4
-===========
-Reorganized -- moved tests into "test" module. Reorganized into
-several files as well as a support modules.
-
-Version 0.5
-===========
-Fixed problem with "dd": now using DIRECT I/O. All tests passing with
-iscsitarget target. Added in use of a third, non-registrant initiator.
-
-Version 0.6
-===========
-Now also testing All Registrants reservations. More clean up and
-consolidation of common code.
+You will now have 3 nodes for the same target, and udev should
+have made 3 devices. Use "sg_inq" on each "/dev/sd?" device you
+find that you think may be our discs. For example, if you start
+out with two discs, e.g. "/dev/sda" and "/dev/sdb", after you take
+the above steps you may see three new devices, e.g. "/dev/sdc",
+"/dev/sdd", and "/dev/sde". These 3 new devices would then be
+the ones you configure in tests/support/initiator.py as your three
+test targets.
