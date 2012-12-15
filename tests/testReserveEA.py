@@ -121,6 +121,7 @@ class test04UnregisterHandlingTestCase(unittest.TestCase):
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         res = initA.unregister()
         self.assertEqual(res, 0)
+        time.sleep(1)                   # for stgt
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, None)
         self.assertEqual(resvnA.rtype, None)

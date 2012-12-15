@@ -95,6 +95,7 @@ class test03CanReleaseReservationTestCase(unittest.TestCase):
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         res = initA.release(my_rtype)
         self.assertEqual(res, 0)
+        initA.runTur()
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, None)
         self.assertEqual(resvnA.rtype, None)
