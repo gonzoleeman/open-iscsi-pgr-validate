@@ -4,10 +4,6 @@ Python tests for SCSI-3 Persistent Group Reservations
 
 Description:
  This module tests Registration. See ... for more details.
-
-
-TODO
- - ...
 """
 
 

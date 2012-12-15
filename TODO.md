@@ -8,6 +8,8 @@ To Do List for PGR testing
 
 * Use libiscsi to get away from open-iscsi setup?
 
+* Test the various Check Condition (Unit Attention) cases
+
 * Test less obvious features, such as:
     - report-capabilities
     - preempt

@@ -4,11 +4,6 @@ Python tests for SCSI-3 Persistent Group Reservations
 
 Description:
  This module tests Write Exclusive All Registranst Reservations.
-
- See ... for more details.
-
-TODO
- - ...
 """
 
 
@@ -37,10 +32,12 @@ def setUpModule():
 
 def my_resvn_setup():
     """make sure we are all setup to test reservations"""
-    if initA.unregister() != 0:
-        initA.unregister()
-    if initB.unregister() != 0:
-        initB.unregister()
+    initA.clear()
+    if initA.runTur() == 6:
+        initA.runTur()
+    initB.clear()
+    if initB.runTur() == 6:
+        initB.runTur()
     initA.register()
     initB.register()
     initC.runTur()
@@ -106,6 +103,7 @@ class test03CanReleaseReservationTestCase(unittest.TestCase):
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
         res = initB.release(my_rtype)
         self.assertEqual(res, 0)
+        initA.runTur()                  # alt release causes UA for devA
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, None)
         self.assertEqual(resvnA.rtype, None)

@@ -4,11 +4,6 @@ Python tests for SCSI-3 Persistent Group Reservations
 
 Description:
  This module tests Exclusive Access Reservations.
-
- See ... for more details.
-
-TODO
- - ...
 """
 
 
@@ -36,10 +31,10 @@ def setUpModule():
 
 def my_resvn_setup():
     """make sure we are all setup to test reservations"""
-    if initA.unregister() != 0:
-        initA.unregister()
-    if initB.unregister() != 0:
-        initB.unregister()
+    initA.clear()
+    initA.runTur()
+    initB.clear()
+    initB.runTur()
     initA.register()
     initB.register()
     initC.runTur()
