@@ -34,9 +34,9 @@ class Initiator:
         res = self.runSgCmdWithOutput(["-k"])
         if "no registered reservation keys" not in res.lines[0].lower():
             for l in res.lines[1:]:
-                log.debug("key=", l.strip())
+                log.debug("key=%s" % l.strip())
                 registrants.append(l.strip())
-        log.debug("Returning registrants list=", registrants)
+        log.debug("Returning registrants list: %s" % registrants)
         return registrants
 
     def register(self):
@@ -75,17 +75,32 @@ class Initiator:
 
     def getReservation(self):
         """Get current reservation"""
-        res = self.runSgCmdWithOutput(["-r"])
+        retry_cnt = 1
+        while retry_cnt > 0:
+            res = self.runSgCmdWithOutput(["-r"])
+            if res.result == 0:
+                break
+            if res.result != 6:
+                log.debug("oh oh -- strange error returned: %d" % res.result)
+                return None
+            if retry_cnt > retry_max:
+                log.debug("oh oh -- command failed to run after retry")
+                return None
+            log.debug("command returned %d so retrying" % res.result)
+            retry_cnt = retry_cnt - 1
+        if not res.lines:
+            log.debug("No lines! FAIL")
+            return None
         log.debug("Parsing %d lines of reservations:" % len(res.lines))
         for o in res.lines:
-            log.debug("line=", o)
+            log.debug("line=%s" % o)
         rr = Reservation()
         if "Reservation follows" in res.lines[0]:
             rr.key = res.lines[1].split("=")[1]
             rline = res.lines[2]
             ridx = rline.index("type:")
             rr.rtype = rline[ridx:].split(":")[1].strip()
-            log.debug("Reservation: found key=", rr.key, "type=", rr.rtype)
+            log.debug("Reservation: found key=%s type=%s" % (rr.key, rr.rtype))
         else:
             log.debug("No Reservation found")
         return rr
@@ -151,4 +166,3 @@ class Initiator:
 initA = Initiator("/dev/sdc", "0x123abc")
 initB = Initiator("/dev/sdd", "0x696969")
 initC = Initiator("/dev/sde", None)
-

@@ -82,7 +82,7 @@ class test02CanReadReservationTestCase(unittest.TestCase):
 
 ################################################################
 
-class test03CanReleseReservationTestCase(unittest.TestCase):
+class test03CanReleaseReservationTestCase(unittest.TestCase):
     """Test that PGR RESERVE Exclusive Access can be released"""
 
     def setUp(self):
