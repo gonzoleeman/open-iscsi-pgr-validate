@@ -12,7 +12,6 @@ __author__ = "Lee Duncan <leeman.duncan@gmail.com>"
 
 import sys
 import os
-import time
 import unittest
 
 from support.initiator import initA, initB, initC
@@ -138,15 +137,17 @@ class test04UnregisterHandlingTestCase(unittest.TestCase):
         self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
 
-    def testNonReservationHolderUnregisterDoesNotReleaseReservation(self):
+    def testAllUnregisterReleasesReservation(self):
         resvnA = initA.getReservation()
         self.assertEqual(resvnA.key, ar_key)
         self.assertEqual(resvnA.getRtypeNum(), my_rtype)
+        res = initA.unregister()
+        self.assertEqual(res, 0)
         res = initB.unregister()
         self.assertEqual(res, 0)
         resvnA = initA.getReservation()
-        self.assertEqual(resvnA.key, ar_key)
-        self.assertEqual(resvnA.getRtypeNum(), my_rtype)
+        self.assertEqual(resvnA.key, None)
+        self.assertEqual(resvnA.rtype, None)
 
 ################################################################
 
@@ -157,7 +158,6 @@ class test05ReservationAccessTestCase(unittest.TestCase):
     def setUp(self):
         my_resvn_setup()
         initA.reserve(my_rtype)
-        time.sleep(2)                   # give I/O time to sync up
 
     def testMainReservationHolderHasReadAccess(self):
         resvnA = initA.getReservation()
