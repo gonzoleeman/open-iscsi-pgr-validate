@@ -4,35 +4,24 @@ Initiator Class for testing PGR
 """
 
 import os
+import logging
 
-from dprint import dprint
 from cmd import runCmdWithOutput
 from reservation import Reservation
 
 
-#
-# config stuff ...
-#
-
 ################################################################
 
-# XXX Fix this -- these need to be global options
-
-# options
-class Opts:
-    pass
-
-Opts.debug = os.getenv("TR_DEBUG")
+log = logging.getLogger('nose.user')
 
 ################################################################
 
 
 class Initiator:
     """A General PGR initiator"""
-    def __init__(self, dev, key, opts):
+    def __init__(self, dev, key):
         self.dev = dev
         self.key = key
-        self.opts = opts
 
     def runSgCmdWithOutput(self, cmd):
         """Run the SG command on specified host"""
@@ -45,9 +34,9 @@ class Initiator:
         res = self.runSgCmdWithOutput(["-k"])
         if "no registered reservation keys" not in res.lines[0].lower():
             for l in res.lines[1:]:
-                dprint(self.opts, "key=", l.strip())
+                log.debug("key=", l.strip())
                 registrants.append(l.strip())
-        dprint(self.opts, "returning registrants list=", registrants)
+        log.debug("Returning registrants list=", registrants)
         return registrants
 
     def register(self):
@@ -87,20 +76,18 @@ class Initiator:
     def getReservation(self):
         """Get current reservation"""
         res = self.runSgCmdWithOutput(["-r"])
-        dprint(self.opts,
-               "Parsing %d lines of reservations:" % len(res.lines))
+        log.debug("Parsing %d lines of reservations:" % len(res.lines))
         for o in res.lines:
-            dprint(self.opts, "line=", o)
-        rr = Reservation(self.opts)
+            log.debug("line=", o)
+        rr = Reservation()
         if "Reservation follows" in res.lines[0]:
             rr.key = res.lines[1].split("=")[1]
             rline = res.lines[2]
             ridx = rline.index("type:")
             rr.rtype = rline[ridx:].split(":")[1].strip()
-            dprint(self.opts,
-                   "Reservation: found key=", rr.key, "type=", rr.rtype)
+            log.debug("Reservation: found key=", rr.key, "type=", rr.rtype)
         else:
-            dprint(self.opts, "No Reservation found")
+            log.debug("No Reservation found")
         return rr
 
     def release(self, prout_type):
@@ -128,7 +115,7 @@ class Initiator:
             if "Unit serial number" in res.lines[-1]:
                 line = res.lines[-1]
                 ret = line.split()[-1]
-        dprint(self.opts, "getDiskInquirySn(%s) -> %s" % (self.dev, ret))
+        log.debug("getDiskInquirySn(%s) -> %s" % (self.dev, ret))
         return ret
 
     def runTur(self):
@@ -161,7 +148,7 @@ class Initiator:
 # For all to use
 #
 
-initA = Initiator("/dev/sdc", "0x123abc", Opts)
-initB = Initiator("/dev/sdd", "0x696969", Opts)
-initC = Initiator("/dev/sde", None, Opts)
+initA = Initiator("/dev/sdc", "0x123abc")
+initB = Initiator("/dev/sdd", "0x696969")
+initC = Initiator("/dev/sde", None)
 

@@ -15,7 +15,7 @@ import os
 from copy import copy
 import unittest
 
-from support.initiator import Initiator, initA, initB, initC
+from support.initiator import initA, initB, initC
 from support.setup import set_up_module
 
 ################################################################
@@ -75,15 +75,19 @@ class test02CanSeeRegistrationsTestCase(unittest.TestCase):
     def testCanSeeRegOnSecondRegistrant(self):
         resA = initA.register()
         self.assertEqual(resA, 0)
+        res = initB.register()
+        self.assertEqual(res, 0)
         registrantsB = initB.getRegistrants()
-        self.assertEqual(len(registrantsB), 1)
+        self.assertEqual(len(registrantsB), 2)
         self.assertEqual(registrantsB[0], initA.key)
 
     def testCanSeeRegOnNonRegistrant(self):
         resA = initA.register()
         self.assertEqual(resA, 0)
+        res = initB.register()
+        self.assertEqual(res, 0)
         registrantsC = initC.getRegistrants()
-        self.assertEqual(len(registrantsC), 1)
+        self.assertEqual(len(registrantsC), 2)
         self.assertEqual(registrantsC[0], initA.key)
 
 ################################################################

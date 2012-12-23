@@ -3,8 +3,15 @@
 reservation stuff for PGR testing
 """
 
-from dprint import dprint
+import logging
+
 from cmd import runCmdWithOutput
+
+################################################################
+
+log = logging.getLogger('nose.user')
+
+################################################################
 
 
 # List of Reservation Types, for prout-type"""
@@ -20,8 +27,7 @@ ProutTypes = {
 
 class Reservation:
     """Represents a reservation on a target"""
-    def __init__(self, opts):
-        self.opts = opts
+    def __init__(self):
         self.key = None
         self.rtype = None
     def getRtypeNum(self):
@@ -39,6 +45,6 @@ class Reservation:
             ret = ProutTypes["ExclusiveAccessAllRegistrants"]
         elif self.rtype == "Write Exclusive, all registrants":
             ret = ProutTypes["WriteExclusiveAllRegistrants"]
-        dprint(self.opts, "Given rtype=%s, returning Num=%s" % \
+        log.debug("Given rtype=%s, returning Num=%s" % \
                (self.rtype, ret))
         return ret

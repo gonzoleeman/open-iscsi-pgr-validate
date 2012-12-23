@@ -7,7 +7,6 @@ __author__ = 'leeman.duncan@gmail.com'
 
 
 __all__ = [
-    'dprint',
     'runCmdWithOutput',
     'verifyCmdExists',
     'Initiator',
