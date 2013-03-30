@@ -75,7 +75,7 @@ class Initiator:
 
     def getReservation(self):
         """Get current reservation"""
-        retry_cnt = 1
+        retry_cnt = 3
         while retry_cnt > 0:
             res = self.runSgCmdWithOutput(["-r"])
             if res.result == 0:
@@ -83,7 +83,7 @@ class Initiator:
             if res.result != 6:
                 log.debug("oh oh -- strange error returned: %d" % res.result)
                 return None
-            if retry_cnt > retry_max:
+            if retry_cnt == 1:
                 log.debug("oh oh -- command failed to run after retry")
                 return None
             log.debug("command returned %d so retrying" % res.result)
