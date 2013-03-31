@@ -145,7 +145,7 @@ class Initiator:
                                  "iflag=direct",
                                  "of=/dev/null",
                                  "skip=1",
-                                 "bs=512",
+                                 "bs=4096",
                                  "count=1"])
         
     def writeToTarget(self):
@@ -154,7 +154,7 @@ class Initiator:
                                  "if=/dev/zero",
                                  "of=" + self.dev,
                                  "oflag=direct",
-                                 "bs=512",
+                                 "bs=4096",
                                  "skip=1",
                                  "seek=1",
                                  "count=1"])
