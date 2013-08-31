@@ -69,8 +69,8 @@ class test02CanSeeRegistrationsTestCase(unittest.TestCase):
         self.assertEqual(res, 0)
         registrantsA = initA.getRegistrants()
         self.assertEqual(len(registrantsA), 2)
-        self.assertEqual(registrantsA[0], initA.key)
-        self.assertEqual(registrantsA[1], initB.key)
+        self.assertIn(initA.key, registrantsA)
+        self.assertIn(initB.key, registrantsA)
 
     def testCanSeeRegOnSecondRegistrant(self):
         resA = initA.register()
@@ -79,7 +79,8 @@ class test02CanSeeRegistrationsTestCase(unittest.TestCase):
         self.assertEqual(res, 0)
         registrantsB = initB.getRegistrants()
         self.assertEqual(len(registrantsB), 2)
-        self.assertEqual(registrantsB[0], initA.key)
+        self.assertIn(initA.key, registrantsB)
+        self.assertIn(initB.key, registrantsB)
 
     def testCanSeeRegOnNonRegistrant(self):
         resA = initA.register()
@@ -88,7 +89,8 @@ class test02CanSeeRegistrationsTestCase(unittest.TestCase):
         self.assertEqual(res, 0)
         registrantsC = initC.getRegistrants()
         self.assertEqual(len(registrantsC), 2)
-        self.assertEqual(registrantsC[0], initA.key)
+        self.assertIn(initA.key, registrantsC)
+        self.assertIn(initB.key, registrantsC)
 
 ################################################################
 
@@ -127,8 +129,8 @@ class test04ReregistrationFailsTestCase(unittest.TestCase):
         self.assertNotEqual(resA, 0)
         registrantsA = initA.getRegistrants()
         self.assertEqual(len(registrantsA), 2)
-        self.assertEqual(registrantsA[0], initA.key)
-        self.assertEqual(registrantsA[1], initB.key)
+        self.assertIn(initA.key, registrantsA)
+        self.assertIn(initB.key, registrantsA)
 
 ################################################################
 
@@ -147,9 +149,11 @@ class test05RegisterAndIgnoreTestCase(unittest.TestCase):
         result = initA.registerAndIgnore(initAcopy.key)
         self.assertEqual(result, 0)
         registrantsA = initAcopy.getRegistrants()
-        self.assertEqual(registrantsA[0], initAcopy.key)
+        self.assertNotIn(initA.key, registrantsA)
+        self.assertIn(initAcopy.key, registrantsA)
         # re-register with normal key
         result = initAcopy.registerAndIgnore(initA.key)
         self.assertEqual(result, 0)
         registrantsA = initA.getRegistrants()
-        self.assertEqual(registrantsA[0], initA.key)
+        self.assertNotIn(initAcopy.key, registrantsA)
+        self.assertIn(initA.key, registrantsA)
