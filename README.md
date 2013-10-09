@@ -20,19 +20,19 @@ Here is how to set things up using open-iscsi on SLE 11 SP2.
 
 Create these three interface files:
 
-File /etc/iscsi/iface/t1:
+File /etc/iscsi/ifaces/t1:
 
     iface.transport_name = tcp
     iface.initiatorname = iqn.2003-04.net.gonzoleeman:test11
     iface.net_ifacename = eth0
 
-File /etc/iscsi/iface/t2:
+File /etc/iscsi/ifaces/t2:
 
     iface.transport_name = tcp
     iface.initiatorname = iqn.2003-04.net.gonzoleeman:test12
     iface.net_ifacename = eth0
 
-File /etc/iscsi/iface/t3:
+File /etc/iscsi/ifaces/t3:
 
     iface.transport_name = tcp
     iface.initiatorname = iqn.2003-04.net.gonzoleeman:test13
