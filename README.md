@@ -77,8 +77,9 @@ Dependencies
 ============
 In order to run these tests, you need:
 
-* Python, version 2.6.8 or newer (not 3)
-* pyunit Python package
+* Python, version 2.6 or newer (not 3)
+* Python unittest package
+  * Also need unittest2 on Python 2.6
 * nosetests Python package
 * An exclusive iSCSI target (i.e. not in use by others)
 * open-iscsi initiator software

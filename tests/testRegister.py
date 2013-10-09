@@ -13,7 +13,10 @@ __author__ = "Lee Duncan <leeman.duncan@gmail.com>"
 import sys
 import os
 from copy import copy
-import unittest
+if sys.version_info < (2, 7):
+    import unittest2 as unittest
+else:
+    import unittest
 
 from support.initiator import initA, initB, initC
 from support.setup import set_up_module
