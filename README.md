@@ -57,3 +57,34 @@ the above steps you may see three new devices, e.g. "/dev/sdc",
 "/dev/sdd", and "/dev/sde". These 3 new devices would then be
 the ones you configure in tests/support/initiator.py as your three
 test targets.
+
+Running The Tests
+=================
+To run the tests, you can use Python directly, or use the "nosetests" front end.
+
+You can get a list of tests by running "nosetests -v --collect-only".
+
+You can see the test groupings by looking in the tests subdirectory.
+
+To run a test group, e.g. the Registration tests, run: "nosetests -v tests.testRegister".
+
+To run an individual test in a group, specify the full test path, e.g.:
+"nosetests -v tests.testRegister.test01CanRegisterTestCase".
+
+To get debug output, use "-vvv" (tripple verbosity).
+
+Dependencies
+============
+In order to run these tests, you need:
+
+* Python, version 2.6.8 or newer (not 3)
+* pyunit Python package
+* nosetests Python package
+* An exclusive iSCSI target (i.e. not in use by others)
+* open-iscsi initiator software
+
+Documentation
+=============
+You can find documentation on PyUnit at: http://pyunit.sourceforge.net
+
+You can find documentation on nose at: http://nose.readthedocs.org/en/latest/
